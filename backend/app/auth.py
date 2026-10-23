@@ -1,35 +1,37 @@
 """Пароли, JWT и проверка прав.
 
 Токен передаётся в заголовке `Authorization: Bearer <token>`.
-Права проверяются на сервере в каждом эндпоинте (декораторы ниже),
-поэтому ограничения действуют и в API, а не только в интерфейсе.
+Права проверяются на сервере в каждом эндпоинте через зависимости
+CurrentUser / AdminUser, поэтому ограничения действуют и в API, а не только в интерфейсе.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from functools import wraps
+from typing import Annotated
 
 import bcrypt
 import jwt
-from flask import g, request
-from flask_smorest import abort
+from fastapi import Depends, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt.exceptions import ExpiredSignatureError, InvalidTokenError
+from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.extensions import db
+from app.db import get_db
+from app.errors import ApiError
 from app.logging_config import get_logger
+from app.models import RevokedToken, User
 
 logger = get_logger(__name__)
 
-JWT_SECRET = settings.jwt_secret_key
-ALGORITHM = settings.jwt_algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+# auto_error=False: без токена отдаём 401 (а не 403, как по умолчанию в FastAPI)
+bearer_scheme = HTTPBearer(auto_error=False, description="JWT из POST /api/v1/auth/login")
 
 
 def hash_password(password: str) -> str:
     """Хеш пароля с bcrypt"""
-    salt = bcrypt.gensalt()
-    return bcrypt.hashpw(password.encode()[:72], salt).decode()
+    return bcrypt.hashpw(password.encode()[:72], bcrypt.gensalt()).decode()
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -43,82 +45,69 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def create_access_token(user_id: int, expires_delta: timedelta | None = None) -> tuple[str, datetime]:
     """Создаём JWT-токен. Возвращает (токен, момент истечения в UTC)."""
     expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
     )
     payload = {
         "sub": str(user_id),  # PyJWT требует строку в sub
         "jti": uuid.uuid4().hex,  # id токена — нужен для logout
         "exp": expire,  # стандартное поле: PyJWT сам проверяет истечение
     }
-    return jwt.encode(payload, JWT_SECRET, algorithm=ALGORITHM), expire
+    return jwt.encode(payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm), expire
 
 
 def decode_access_token(token: str) -> dict:
     """Декодируем JWT токен"""
     try:
         return jwt.decode(
-            token, JWT_SECRET, algorithms=[ALGORITHM], options={"require": ["exp", "sub", "jti"]}
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "sub", "jti"]},
         )
     except ExpiredSignatureError:
-        abort(401, message="Срок действия токена истёк")
+        raise ApiError(401, "Срок действия токена истёк")
     except InvalidTokenError:
-        abort(401, message="Недействительный токен")
+        raise ApiError(401, "Недействительный токен")
 
 
-def _token_from_request() -> str | None:
-    header = request.headers.get("Authorization", "")
-    if header.lower().startswith("bearer "):
-        return header[7:].strip() or None
-    return None
+@dataclass
+class AuthContext:
+    user: User
+    token_payload: dict
 
 
-def authenticate():
-    """Достаёт пользователя из токена и кладёт в g.current_user / g.token_payload."""
-    from app.models import RevokedToken, User
+def get_auth(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    db: Annotated[Session, Depends(get_db)],
+) -> AuthContext:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise ApiError(401, "Требуется авторизация")
 
-    token = _token_from_request()
-    if not token:
-        abort(401, message="Требуется авторизация")
+    payload = decode_access_token(credentials.credentials)
+    if db.get(RevokedToken, payload["jti"]):
+        raise ApiError(401, "Сессия завершена, войдите снова")
 
-    payload = decode_access_token(token)
-    if db.session.get(RevokedToken, payload["jti"]):
-        abort(401, message="Сессия завершена, войдите снова")
-
-    user = db.session.get(User, int(payload["sub"]))
+    user = db.get(User, int(payload["sub"]))
     if user is None:
-        abort(401, message="Пользователь не найден")
+        raise ApiError(401, "Пользователь не найден")
+    return AuthContext(user=user, token_payload=payload)
 
-    g.current_user = user
-    g.token_payload = payload
+
+def get_current_user(auth: Annotated[AuthContext, Depends(get_auth)]) -> User:
+    """Любой авторизованный пользователь."""
+    return auth.user
+
+
+def get_admin_user(request: Request, user: Annotated[User, Depends(get_current_user)]) -> User:
+    """Только администратор. Обычный пользователь получает 403 — и в панели, и в API."""
+    if not user.is_admin:
+        logger.warning(f"Отказ в доступе: {user.username} -> {request.method} {request.url.path}")
+        raise ApiError(403, "Действие доступно только администратору")
     return user
 
 
-def login_required(fn):
-    """Любой авторизованный пользователь."""
-
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        authenticate()
-        return fn(*args, **kwargs)
-
-    return wrapper
-
-
-def admin_required(fn):
-    """Только администратор. Обычный пользователь получает 403 — и в панели, и в API."""
-
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        user = authenticate()
-        if not user.is_admin:
-            logger.warning(
-                f"Отказ в доступе: {user.username} -> {request.method} {request.path}"
-            )
-            abort(403, message="Действие доступно только администратору")
-        return fn(*args, **kwargs)
-
-    return wrapper
-
-
-def current_user():
-    return g.get("current_user")
+# Короткие алиасы для сигнатур эндпоинтов
+DB = Annotated[Session, Depends(get_db)]
+CurrentUser = Annotated[User, Depends(get_current_user)]
+AdminUser = Annotated[User, Depends(get_admin_user)]
+Auth = Annotated[AuthContext, Depends(get_auth)]

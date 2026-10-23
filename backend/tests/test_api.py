@@ -13,14 +13,14 @@ def create_payment(client, headers, **overrides):
     body = {"name": "Аренда", "amount": "50000", "currency": "RUB", "first_due_date": "2026-10-25"}
     body.update(overrides)
     r = client.post(f"{API}/recurring-payments", json=body, headers=headers)
-    assert r.status_code == 201, r.json
-    return r.json
+    assert r.status_code == 201, r.json()
+    return r.json()
 
 
 def occurrences(client, headers, **params):
-    r = client.get(f"{API}/payment-occurrences", query_string=params, headers=headers)
-    assert r.status_code == 200, r.json
-    return r.json
+    r = client.get(f"{API}/payment-occurrences", params=params, headers=headers)
+    assert r.status_code == 200, r.json()
+    return r.json()
 
 
 # ---------- Запуск и доступ ----------
@@ -43,7 +43,7 @@ def test_no_access_without_auth(client):
 def test_login_me_logout(client):
     assert client.post(f"{API}/auth/login", json={"username": "admin", "password": "bad"}).status_code == 401
     headers = login(client, "admin", "admin-pass")
-    me = client.get(f"{API}/auth/me", headers=headers).json
+    me = client.get(f"{API}/auth/me", headers=headers).json()
     assert me["role"] == "admin" and me["is_env_admin"] is True
     assert client.post(f"{API}/auth/logout", headers=headers).status_code == 200
     assert client.get(f"{API}/auth/me", headers=headers).status_code == 401
@@ -51,7 +51,7 @@ def test_login_me_logout(client):
 
 def test_swagger_and_spec(client):
     assert client.get(f"{API}/docs").status_code == 200
-    spec = client.get(f"{API}/openapi.json").json
+    spec = client.get(f"{API}/openapi.json").json()
     for path in ["/api/v1/auth/login", "/api/v1/recurring-payments/{payment_id}",
                  "/api/v1/payment-occurrences/{occurrence_id}", "/api/v1/payments/summary",
                  "/api/v1/users/{user_id}"]:
@@ -72,11 +72,11 @@ def test_user_cannot_do_admin_actions_via_api(client, admin, user):
     assert client.get(f"{API}/recurring-payments", headers=user).status_code == 200
     occ = occurrences(client, user)[0]
     r = client.patch(f"{API}/payment-occurrences/{occ['id']}", json={"status": "paid"}, headers=user)
-    assert r.status_code == 200 and r.json["status"] == "paid"
+    assert r.status_code == 200 and r.json()["status"] == "paid"
 
 
 def test_env_admin_cannot_be_managed(client, admin):
-    users = client.get(f"{API}/users", headers=admin).json
+    users = client.get(f"{API}/users", headers=admin).json()
     admin_id = next(u["id"] for u in users if u["is_env_admin"])
     assert client.patch(f"{API}/users/{admin_id}", json={"password": "newpass1"}, headers=admin).status_code == 403
     assert client.delete(f"{API}/users/{admin_id}", headers=admin).status_code == 403
@@ -84,8 +84,8 @@ def test_env_admin_cannot_be_managed(client, admin):
 
 def test_user_crud(client, admin):
     r = client.post(f"{API}/users", json={"username": "petr", "password": "petr12345"}, headers=admin)
-    assert r.status_code == 201 and r.json["role"] == "user"
-    uid = r.json["id"]
+    assert r.status_code == 201 and r.json()["role"] == "user"
+    uid = r.json()["id"]
     assert client.post(f"{API}/users", json={"username": "petr", "password": "x123456"}, headers=admin).status_code == 409
     assert client.patch(f"{API}/users/{uid}", json={"password": "newpass1"}, headers=admin).status_code == 200
     login(client, "petr", "newpass1")
@@ -96,7 +96,7 @@ def test_user_crud(client, admin):
 def test_deleted_user_token_stops_working(client, admin):
     r = client.post(f"{API}/users", json={"username": "temp", "password": "temp12345"}, headers=admin)
     headers = login(client, "temp", "temp12345")
-    client.delete(f"{API}/users/{r.json['id']}", headers=admin)
+    client.delete(f"{API}/users/{r.json()['id']}", headers=admin)
     assert client.get(f"{API}/auth/me", headers=headers).status_code == 401
 
 
@@ -141,15 +141,15 @@ def test_overdue_rules_and_paid_at_correction(client, admin):
 
     # Оплатили сегодня (позже срока) → оплачено с опозданием
     r = client.patch(f"{API}/payment-occurrences/{occ['id']}", json={"status": "paid"}, headers=admin)
-    assert r.json["state"] == "paid_late" and r.json["paid_at"] == "2026-10-23"
+    assert r.json()["state"] == "paid_late" and r.json()["paid_at"] == "2026-10-23"
 
     # Исправили дату на день срока → просрочка исчезла, срок не изменился
     r = client.patch(f"{API}/payment-occurrences/{occ['id']}", json={"paid_at": "2026-10-20"}, headers=admin)
-    assert r.json["state"] == "paid" and r.json["overdue_days"] == 0 and r.json["due_date"] == "2026-10-20"
+    assert r.json()["state"] == "paid" and r.json()["overdue_days"] == 0 and r.json()["due_date"] == "2026-10-20"
 
     # Отмена отметки → дата очищается
     r = client.patch(f"{API}/payment-occurrences/{occ['id']}", json={"status": "unpaid"}, headers=admin)
-    assert r.json["status"] == "unpaid" and r.json["paid_at"] is None and r.json["state"] == "overdue"
+    assert r.json()["status"] == "unpaid" and r.json()["paid_at"] is None and r.json()["state"] == "overdue"
 
 
 def test_patch_validation(client, admin):
@@ -178,48 +178,48 @@ def test_reminder_sent_immediately_when_added_late(client, admin, sent):
     assert "Сервер" in sent[0] and "20.00 USD" in sent[0] and "25.10.2026" in sent[0]
 
 
-def test_reminder_window_and_no_duplicates(client, admin, sent):
+def test_reminder_window_and_no_duplicates(client, admin, sent, db):
     create_payment(client, admin, first_due_date="2026-11-10")  # далеко — без напоминания
     assert sent == []
 
     timeutils.FROZEN_TODAY = date(2026, 11, 6)  # за 4 дня — рано
-    check_and_send()
+    check_and_send(db)
     assert sent == []
 
     timeutils.FROZEN_TODAY = date(2026, 11, 7)  # за 3 дня — пора
-    check_and_send()
-    check_and_send()  # повторная проверка не создаёт дубль
+    check_and_send(db)
+    check_and_send(db)  # повторная проверка не создаёт дубль
     timeutils.FROZEN_TODAY = date(2026, 11, 8)
-    check_and_send()
+    check_and_send(db)
     assert len(sent) == 1
 
 
-def test_paid_period_not_reminded(client, admin, sent):
+def test_paid_period_not_reminded(client, admin, sent, db):
     rp = create_payment(client, admin, first_due_date="2026-11-10")
     occ = occurrences(client, admin, recurring_payment_id=rp["id"])[0]
     client.patch(f"{API}/payment-occurrences/{occ['id']}", json={"status": "paid"}, headers=admin)
     timeutils.FROZEN_TODAY = date(2026, 11, 8)
-    check_and_send()
+    check_and_send(db)
     assert sent == []
 
 
-def test_deleted_payment_not_reminded_history_kept(client, admin, sent):
+def test_deleted_payment_not_reminded_history_kept(client, admin, sent, db):
     rp = create_payment(client, admin, first_due_date="2026-09-10")  # сентябрь просрочен, октябрь тоже
     assert client.delete(f"{API}/recurring-payments/{rp['id']}", headers=admin).status_code == 204
     assert client.delete(f"{API}/recurring-payments/{rp['id']}", headers=admin).status_code == 404
 
     timeutils.FROZEN_TODAY = date(2026, 11, 8)
-    check_and_send()
+    check_and_send(db)
     assert sent == []
 
     occs = occurrences(client, admin, recurring_payment_id=rp["id"])
     assert [o["due_date"] for o in occs] == ["2026-09-10", "2026-10-10"]  # история осталась
     assert all(o["recurring_payment_active"] is False for o in occs)
-    assert client.get(f"{API}/recurring-payments", headers=admin).json == []
-    assert len(client.get(f"{API}/recurring-payments?include_inactive=true", headers=admin).json) == 1
+    assert client.get(f"{API}/recurring-payments", headers=admin).json() == []
+    assert len(client.get(f"{API}/recurring-payments?include_inactive=true", headers=admin).json()) == 1
 
 
-def test_failed_telegram_send_is_retried(client, admin, monkeypatch):
+def test_failed_telegram_send_is_retried(client, admin, monkeypatch, db):
     from app.services import telegram
 
     calls = []
@@ -232,8 +232,8 @@ def test_failed_telegram_send_is_retried(client, admin, monkeypatch):
 
     monkeypatch.setattr(telegram, "send_message", flaky)
     create_payment(client, admin, first_due_date="2026-10-25")  # первая попытка падает
-    check_and_send()  # вторая — успешна
-    check_and_send()  # дубля нет
+    check_and_send(db)  # вторая — успешна
+    check_and_send(db)  # дубля нет
     assert len(calls) == 2
 
 
@@ -247,7 +247,7 @@ def test_summary_per_currency_without_conversion(client, admin):
     eur = occurrences(client, admin, recurring_payment_id=rp["id"])[0]
     client.patch(f"{API}/payment-occurrences/{eur['id']}", json={"status": "paid", "paid_at": "2026-10-01"}, headers=admin)
 
-    s = client.get(f"{API}/payments/summary?date_from=2026-10-01&date_to=2026-10-31", headers=admin).json
+    s = client.get(f"{API}/payments/summary?date_from=2026-10-01&date_to=2026-10-31", headers=admin).json()
     by = {c["currency"]: c for c in s["currencies"]}
     assert by["RUB"]["total"] == "1000.50" and by["RUB"]["overdue"] == "1000.50"
     assert by["USD"]["unpaid"] == "20.00" and by["USD"]["overdue"] == "0.00"
@@ -266,5 +266,19 @@ def test_amount_validation(client, admin):
 
 def test_audit_log(client, admin):
     create_payment(client, admin)
-    actions = [e["action"] for e in client.get(f"{API}/audit-logs", headers=admin).json]
+    actions = [e["action"] for e in client.get(f"{API}/audit-logs", headers=admin).json()]
     assert "recurring_payment.create" in actions and "auth.login" in actions
+
+
+def test_error_format_matches_frontend_contract(client, admin):
+    r = client.post(f"{API}/recurring-payments", json={"name": "x", "amount": "-1", "currency": "GBP"}, headers=admin)
+    body = r.json()
+    assert r.status_code == 422 and body["code"] == 422 and body["status"] == "Unprocessable Entity"
+    fields = body["errors"]["json"]
+    assert fields["amount"] == ["Сумма должна быть больше нуля"]
+    assert fields["first_due_date"] == ["Обязательное поле"]
+    assert "currency" in fields
+    assert body["message"]  # первое сообщение — для тоста на фронте
+
+    r = client.get(f"{API}/users", headers={"Authorization": "Bearer garbage"})
+    assert r.status_code == 401 and r.json()["message"] == "Недействительный токен"

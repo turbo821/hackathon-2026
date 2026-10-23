@@ -1,6 +1,9 @@
-from datetime import date
+from datetime import date, datetime
 
-from app.extensions import db
+from sqlalchemy import Date, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db import Base
 from app.timeutils import utcnow
 
 STATUS_PAID = "paid"
@@ -15,39 +18,32 @@ STATE_PAID_LATE = "paid_late"  # оплачено после срока
 STATES = (STATE_PENDING, STATE_OVERDUE, STATE_PAID, STATE_PAID_LATE)
 
 
-class PaymentOccurrence(db.Model):
+class PaymentOccurrence(Base):
     """Конкретный период регулярного платежа: своя дата и своя отметка оплаты."""
 
     __tablename__ = "payment_occurrences"
     __table_args__ = (
         # Один период на дату — защита от дублей при параллельной генерации
-        db.UniqueConstraint(
-            "recurring_payment_id", "due_date", name="uq_occurrence_payment_due_date"
-        ),
+        UniqueConstraint("recurring_payment_id", "due_date", name="uq_occurrence_payment_due_date"),
     )
 
-    id = db.Column(db.Integer, primary_key=True)
-    recurring_payment_id = db.Column(
-        db.Integer,
-        db.ForeignKey("recurring_payments.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    recurring_payment_id: Mapped[int] = mapped_column(
+        ForeignKey("recurring_payments.id", ondelete="CASCADE"), index=True
     )
-    due_date = db.Column(db.Date, nullable=False, index=True)
-    status = db.Column(db.String(16), nullable=False, default=STATUS_UNPAID, index=True)
+    due_date: Mapped[date] = mapped_column(Date, index=True)
+    status: Mapped[str] = mapped_column(String(16), default=STATUS_UNPAID, index=True)
     # Фактическая дата оплаты; при отмене отметки очищается
-    paid_at = db.Column(db.Date, nullable=True)
-    marked_by_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    paid_at: Mapped[date | None] = mapped_column(Date)
+    marked_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     # Когда отправлено напоминание: NULL → ещё не напоминали (защита от дублей)
-    reminder_sent_at = db.Column(db.DateTime, nullable=True)
+    reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
-    recurring_payment = db.relationship("RecurringPayment", back_populates="occurrences")
-    marked_by = db.relationship("User", foreign_keys=[marked_by_id])
+    recurring_payment = relationship("RecurringPayment", back_populates="occurrences")
+    marked_by = relationship("User", foreign_keys=[marked_by_id])
 
     # --- Просрочка вычисляется, а не хранится: исправили paid_at → пересчиталась ---
 

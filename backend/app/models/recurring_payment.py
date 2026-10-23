@@ -1,4 +1,10 @@
-from app.extensions import db
+from datetime import date, datetime
+from decimal import Decimal
+
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db import Base
 from app.timeutils import utcnow
 
 CURRENCIES = ("RUB", "USD", "EUR")
@@ -12,34 +18,32 @@ PERIOD_MONTHS = {
 PERIODS = tuple(PERIOD_MONTHS)
 
 
-class RecurringPayment(db.Model):
+class RecurringPayment(Base):
     """Шаблон регулярного платежа. Конкретные периоды — PaymentOccurrence."""
 
     __tablename__ = "recurring_payments"
 
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
     # Деньги — только Numeric/Decimal, никаких float
-    amount = db.Column(db.Numeric(14, 2), nullable=False)
-    currency = db.Column(db.String(3), nullable=False)
-    period = db.Column(db.String(16), nullable=False, default="monthly")
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    currency: Mapped[str] = mapped_column(String(3))
+    period: Mapped[str] = mapped_column(String(16), default="monthly")
     # Дата первой (ближайшей на момент создания) оплаты
-    first_due_date = db.Column(db.Date, nullable=False)
+    first_due_date: Mapped[date] = mapped_column(Date)
     # Число месяца, от которого считаются все даты (31 → в феврале 28/29)
-    anchor_day = db.Column(db.Integer, nullable=False)
+    anchor_day: Mapped[int] = mapped_column(Integer)
 
     # Мягкое удаление: история периодов сохраняется
-    is_active = db.Column(db.Boolean, nullable=False, default=True, index=True)
-    ended_at = db.Column(db.DateTime, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    created_by_id = db.Column(
-        db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-    created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=utcnow, onupdate=utcnow)
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
-    created_by = db.relationship("User", foreign_keys=[created_by_id])
-    occurrences = db.relationship(
+    created_by = relationship("User", foreign_keys=[created_by_id])
+    occurrences = relationship(
         "PaymentOccurrence",
         back_populates="recurring_payment",
         order_by="PaymentOccurrence.due_date",

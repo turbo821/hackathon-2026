@@ -1,20 +1,34 @@
 """Запись действий в журнал (таблица audit_logs) + дублирование в логгер."""
 
-from flask import has_request_context, request
+from fastapi import Request
+from sqlalchemy.orm import Session
 
-from app.extensions import db
 from app.logging_config import get_logger
 from app.models import AuditLog
 
 logger = get_logger(__name__)
 
 
-def audit(action: str, user=None, entity_type=None, entity_id=None, details=None, commit=False):
-    """Добавляет запись в журнал. По умолчанию коммит делает вызывающий код."""
-    ip = None
-    if has_request_context():
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+def client_ip(request: Request | None) -> str | None:
+    if request is None:
+        return None
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else None
 
+
+def audit(
+    db: Session,
+    action: str,
+    user=None,
+    entity_type: str | None = None,
+    entity_id: int | None = None,
+    details: dict | None = None,
+    request: Request | None = None,
+    commit: bool = False,
+) -> AuditLog:
+    """Добавляет запись в журнал. По умолчанию коммит делает вызывающий код."""
     entry = AuditLog(
         user_id=user.id if user else None,
         username=user.username if user else (details or {}).get("username"),
@@ -22,11 +36,11 @@ def audit(action: str, user=None, entity_type=None, entity_id=None, details=None
         entity_type=entity_type,
         entity_id=entity_id,
         details=details,
-        ip=ip,
+        ip=client_ip(request),
     )
-    db.session.add(entry)
+    db.add(entry)
     if commit:
-        db.session.commit()
+        db.commit()
 
     who = entry.username or "anonymous"
     target = f" {entity_type}#{entity_id}" if entity_type else ""

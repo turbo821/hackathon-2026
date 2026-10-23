@@ -115,7 +115,7 @@ class OccurrenceItem(MethodView):
 
     @login_required
     @router.arguments(OccurrenceUpdateSchema)
-    @router.response(200, OccurrenceSchema)
+    @router.response (200, OccurrenceSchema)
     @router.alt_response(404, description="Платёж не найден")
     @router.alt_response(409, description="Нельзя исправить дату у неоплаченного периода")
     def patch(self, data, occurrence_id):

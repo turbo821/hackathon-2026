@@ -1,169 +1,135 @@
-from marshmallow import ValidationError, fields, validate, validates_schema
+from datetime import date
+from typing import Literal
 
-from app.models.payment_occurrence import STATES, STATUSES
-from app.models.recurring_payment import CURRENCIES, PERIODS
-from app.schemas.common import BaseSchema, Money, UtcDateTime
+from pydantic import Field, field_validator, model_validator
+
+from app.schemas.common import MoneyIn, MoneyOut, Schema, UtcDateTime
 from app.timeutils import today
+
+Currency = Literal["RUB", "USD", "EUR"]
+Period = Literal["monthly", "quarterly", "yearly"]
+Status = Literal["paid", "unpaid"]
+State = Literal["pending", "overdue", "paid", "paid_late"]
 
 # ---------- Регулярные платежи ----------
 
 
-class RecurringPaymentCreateSchema(BaseSchema):
-    name = fields.String(
-        required=True,
-        validate=validate.Length(min=1, max=200, error="Название: от 1 до 200 символов"),
-        metadata={"example": "Аренда офиса"},
-    )
-    amount = Money(required=True, metadata={"type": "string", "example": "50000.00"})
-    currency = fields.String(
-        required=True,
-        validate=validate.OneOf(CURRENCIES, error="Валюта: RUB, USD или EUR"),
-        metadata={"example": "RUB"},
-    )
-    first_due_date = fields.Date(
-        required=True,
-        metadata={"description": "Дата ближайшей оплаты (YYYY-MM-DD)", "example": "2026-10-25"},
-    )
-    period = fields.String(
-        load_default="monthly",
-        validate=validate.OneOf(PERIODS),
-        metadata={"description": "Периодичность: monthly (по умолчанию), quarterly, yearly"},
-    )
+class RecurringPaymentCreate(Schema):
+    name: str = Field(examples=["Аренда офиса"])
+    amount: MoneyIn
+    currency: Currency = Field(examples=["RUB"])
+    first_due_date: date = Field(description="Дата ближайшей оплаты (YYYY-MM-DD)", examples=["2026-10-25"])
+    period: Period = Field("monthly", description="Периодичность: monthly (по умолчанию), quarterly, yearly")
 
-    @validates_schema
-    def strip_name(self, data, **kwargs):
-        if "name" in data:
-            data["name"] = data["name"].strip()
-            if not data["name"]:
-                raise ValidationError("Название не может быть пустым", "name")
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("Название не может быть пустым")
+        if len(v) > 200:
+            raise ValueError("Название: от 1 до 200 символов")
+        return v
 
 
-class NextOccurrenceSchema(BaseSchema):
-    id = fields.Integer()
-    due_date = fields.Date()
-    status = fields.String()
-    state = fields.String()
+class NextOccurrence(Schema):
+    id: int
+    due_date: date
+    status: Status
+    state: State
 
 
-class RecurringPaymentSchema(BaseSchema):
-    id = fields.Integer()
-    name = fields.String()
-    amount = Money(metadata={"type": "string", "example": "50000.00"})
-    currency = fields.String()
-    period = fields.String()
-    first_due_date = fields.Date()
-    anchor_day = fields.Integer(metadata={"description": "Число месяца, от которого считаются даты"})
-    is_active = fields.Boolean()
-    ended_at = UtcDateTime(allow_none=True)
-    created_at = UtcDateTime()
-    next_occurrence = fields.Nested(
-        NextOccurrenceSchema,
-        allow_none=True,
-        metadata={"description": "Ближайший неоплаченный период"},
-    )
-
-
-class RecurringPaymentQuerySchema(BaseSchema):
-    include_inactive = fields.Boolean(
-        load_default=False, metadata={"description": "Показывать прекращённые платежи"}
-    )
+class RecurringPaymentOut(Schema):
+    id: int
+    name: str
+    amount: MoneyOut
+    currency: Currency
+    period: Period
+    first_due_date: date
+    anchor_day: int = Field(description="Число месяца, от которого считаются даты")
+    is_active: bool
+    ended_at: UtcDateTime | None
+    created_at: UtcDateTime
+    next_occurrence: NextOccurrence | None = Field(description="Ближайший неоплаченный период")
 
 
 # ---------- Периоды (оплаты) ----------
 
 
-class OccurrenceSchema(BaseSchema):
-    id = fields.Integer()
-    recurring_payment_id = fields.Integer()
-    name = fields.String()
-    amount = Money(metadata={"type": "string", "example": "50000.00"})
-    currency = fields.String()
-    due_date = fields.Date(metadata={"description": "Срок оплаты этого периода"})
-    status = fields.String(metadata={"enum": list(STATUSES)})
-    paid_at = fields.Date(allow_none=True, metadata={"description": "Фактическая дата оплаты"})
-    state = fields.String(
-        metadata={
-            "enum": list(STATES),
-            "description": "pending — ждёт оплаты, overdue — просрочен, "
-            "paid — оплачен вовремя, paid_late — оплачен с опозданием",
-        }
+class OccurrenceOut(Schema):
+    id: int
+    recurring_payment_id: int
+    name: str
+    amount: MoneyOut
+    currency: Currency
+    due_date: date = Field(description="Срок оплаты этого периода")
+    status: Status
+    paid_at: date | None = Field(description="Фактическая дата оплаты")
+    state: State = Field(
+        description="pending — ждёт оплаты, overdue — просрочен, "
+        "paid — оплачен вовремя, paid_late — оплачен с опозданием"
     )
-    is_overdue = fields.Boolean(metadata={"description": "Сейчас просрочен (не оплачен после срока)"})
-    overdue_days = fields.Integer(
-        metadata={"description": "Дней просрочки (для оплаченных — на дату оплаты)"}
-    )
-    days_until_due = fields.Integer(metadata={"description": "Дней до срока (<0 — срок прошёл)"})
-    reminder_sent_at = UtcDateTime(allow_none=True)
-    marked_by = fields.String(allow_none=True, metadata={"description": "Кто отметил оплату"})
-    recurring_payment_active = fields.Boolean()
+    is_overdue: bool = Field(description="Сейчас просрочен (не оплачен после срока)")
+    overdue_days: int = Field(description="Дней просрочки (для оплаченных — на дату оплаты)")
+    days_until_due: int = Field(description="Дней до срока (<0 — срок прошёл)")
+    reminder_sent_at: UtcDateTime | None
+    marked_by: str | None = Field(description="Кто отметил оплату")
+    recurring_payment_active: bool
 
 
-class OccurrenceQuerySchema(BaseSchema):
-    state = fields.String(validate=validate.OneOf(STATES + ("unpaid_all",)), metadata={
-        "description": "Фильтр по состоянию. unpaid_all = pending + overdue",
-    })
-    status = fields.String(validate=validate.OneOf(STATUSES))
-    currency = fields.String(validate=validate.OneOf(CURRENCIES))
-    recurring_payment_id = fields.Integer()
-    date_from = fields.Date(metadata={"description": "Срок оплаты с (включительно)"})
-    date_to = fields.Date(metadata={"description": "Срок оплаты по (включительно)"})
-    include_inactive = fields.Boolean(
-        load_default=True, metadata={"description": "Включать периоды прекращённых платежей"}
-    )
-    include_future = fields.Boolean(
-        load_default=True, metadata={"description": "Включать ещё не наступившие периоды"}
-    )
-    order = fields.String(load_default="asc", validate=validate.OneOf(("asc", "desc")))
+class OccurrenceUpdate(Schema):
+    """Передайте status и/или paid_at."""
 
-
-class OccurrenceUpdateSchema(BaseSchema):
-    status = fields.String(
-        validate=validate.OneOf(STATUSES, error="status: paid или unpaid"),
-        metadata={"description": "paid — подтвердить оплату, unpaid — отменить"},
-    )
-    paid_at = fields.Date(
-        allow_none=True,
-        metadata={
-            "description": "Фактическая дата оплаты. При status=paid без даты — сегодня. "
-            "Можно передать без status, чтобы исправить дату у оплаченного периода."
-        },
+    status: Status | None = Field(None, description="paid — подтвердить оплату, unpaid — отменить")
+    paid_at: date | None = Field(
+        None,
+        description="Фактическая дата оплаты. При status=paid без даты — сегодня. "
+        "Можно передать без status, чтобы исправить дату у оплаченного периода.",
     )
 
-    @validates_schema
-    def check(self, data, **kwargs):
-        if "status" not in data and "paid_at" not in data:
-            raise ValidationError("Передайте status и/или paid_at")
-        if data.get("status") == "unpaid" and data.get("paid_at"):
-            raise ValidationError("При отмене оплаты дату передавать нельзя", "paid_at")
-        if data.get("paid_at") and data["paid_at"] > today():
-            raise ValidationError("Дата оплаты не может быть в будущем", "paid_at")
+    @model_validator(mode="after")
+    def check(self):
+        if "status" not in self.model_fields_set and "paid_at" not in self.model_fields_set:
+            raise ValueError("Передайте status и/или paid_at")
+        if self.status == "unpaid" and self.paid_at:
+            raise ValueError("При отмене оплаты дату передавать нельзя")
+        if self.paid_at and self.paid_at > today():
+            raise ValueError("Дата оплаты не может быть в будущем")
+        return self
 
 
 # ---------- Итоги ----------
 
 
-class SummaryQuerySchema(BaseSchema):
-    date_from = fields.Date(metadata={"description": "Срок оплаты с (включительно)"})
-    date_to = fields.Date(metadata={"description": "Срок оплаты по (включительно)"})
-    on_date = fields.Date(
-        metadata={"description": "Дата, на которую считаются статусы и просрочка (по умолчанию сегодня)"}
-    )
+class CurrencyTotals(Schema):
+    currency: Currency
+    total: MoneyOut
+    paid: MoneyOut
+    unpaid: MoneyOut
+    overdue: MoneyOut
+    count_total: int
+    count_paid: int
+    count_unpaid: int
+    count_overdue: int
 
 
-class CurrencyTotalsSchema(BaseSchema):
-    currency = fields.String()
-    total = Money(metadata={"type": "string"})
-    paid = Money(metadata={"type": "string"})
-    unpaid = Money(metadata={"type": "string"})
-    overdue = Money(metadata={"type": "string"})
-    count_total = fields.Integer()
-    count_paid = fields.Integer()
-    count_unpaid = fields.Integer()
-    count_overdue = fields.Integer()
+class SummaryOut(Schema):
+    date_from: date | None
+    date_to: date | None
+    on_date: date
+    currencies: list[CurrencyTotals]
 
 
-class SummarySchema(BaseSchema):
-    date_from = fields.Date(allow_none=True)
-    date_to = fields.Date(allow_none=True)
-    on_date = fields.Date()
-    currencies = fields.List(fields.Nested(CurrencyTotalsSchema))
+# ---------- Журнал ----------
+
+
+class AuditLogOut(Schema):
+    id: int
+    created_at: UtcDateTime
+    user_id: int | None
+    username: str | None
+    action: str
+    entity_type: str | None
+    entity_id: int | None
+    details: dict | None
+    ip: str | None

@@ -4,4 +4,4 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 ENTRYPOINT ["sh", "./entrypoint.sh"]
-CMD ["flask", "--app", "main", "run", "--host=0.0.0.0", "--port=5000", "--debug"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000", "--reload"]

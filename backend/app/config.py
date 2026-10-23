@@ -5,10 +5,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # --- БД ---
-    # SQLite. Относительный путь (sqlite:///) Flask-SQLAlchemy разрешает
-    # относительно папки instance приложения: backend/instance/app.db
-    database_url: str = "sqlite:///app.db"
-    sqlalchemy_track_modifications: bool = False
+    # SQLite-файл backend/instance/app.db (путь относительно папки backend)
+    database_url: str = "sqlite:///./instance/app.db"
 
     # --- JWT ---
     jwt_secret_key: str = "dev-only-secret-change-me-in-env-file-please"

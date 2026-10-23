@@ -8,10 +8,9 @@
 import signal
 import time
 
-from app import create_app
 from app.config import settings
-from app.extensions import db
-from app.logging_config import get_logger
+from app.db import SessionLocal
+from app.logging_config import get_logger, setup_logging
 from app.services import telegram
 from app.services.reminders import check_and_send
 
@@ -26,20 +25,20 @@ def _stop(signum, frame):
     _running = False
 
 
-def run_once(app) -> int:
-    with app.app_context():
-        try:
-            return check_and_send()
-        except Exception:
-            logger.exception("Ошибка при проверке напоминаний")
-            db.session.rollback()
-            return 0
-        finally:
-            db.session.remove()
+def run_once() -> int:
+    db = SessionLocal()
+    try:
+        return check_and_send(db)
+    except Exception:
+        logger.exception("Ошибка при проверке напоминаний")
+        db.rollback()
+        return 0
+    finally:
+        db.close()
 
 
 def main():
-    app = create_app(log_name="worker")
+    setup_logging(name="worker")
     signal.signal(signal.SIGTERM, _stop)
     signal.signal(signal.SIGINT, _stop)
 
@@ -52,7 +51,7 @@ def main():
         logger.warning("Telegram не настроен — напоминания отправляться не будут")
 
     while _running:
-        sent = run_once(app)
+        sent = run_once()
         if sent:
             logger.info(f"Отправлено напоминаний: {sent}")
         # Спим маленькими шагами, чтобы быстро реагировать на остановку контейнера

@@ -10,29 +10,45 @@ os.environ["ADMIN_PASSWORD"] = "admin-pass"
 os.environ["TELEGRAM_BOT_TOKEN"] = "test-token"
 os.environ["TELEGRAM_CHAT_ID"] = "-100123"
 
-from app import create_app, timeutils  # noqa: E402
-from app.extensions import db  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+from app import models  # noqa: E402,F401
+from app import timeutils  # noqa: E402
+from app.db import Base, get_db, make_engine  # noqa: E402
+from app.main import app  # noqa: E402
 from app.services import telegram  # noqa: E402
 
 TODAY = date(2026, 10, 23)
 
 
 @pytest.fixture
-def app(tmp_path):
-    app = create_app(
-        config_overrides={
-            "SQLALCHEMY_DATABASE_URI": f"sqlite:///{tmp_path / 'test.db'}",
-            "TESTING": True,
-        }
-    )
-    with app.app_context():
-        db.create_all()
+def session_factory(tmp_path):
+    engine = make_engine(f"sqlite:///{tmp_path / 'test.db'}")
+    Base.metadata.create_all(engine)
+    factory = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
+
+    def override_get_db():
+        db = factory()
+        try:
+            yield db
+        finally:
+            db.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    with factory() as db:
         from scripts import seed_admin
 
-        seed_admin.run()
-        yield app
-        db.session.remove()
-        db.drop_all()
+        seed_admin.run(db)
+    yield factory
+    app.dependency_overrides.clear()
+    engine.dispose()
+
+
+@pytest.fixture
+def db(session_factory):
+    with session_factory() as session:
+        yield session
 
 
 @pytest.fixture(autouse=True)
@@ -51,14 +67,14 @@ def sent(monkeypatch):
 
 
 @pytest.fixture
-def client(app, sent):
-    return app.test_client()
+def client(session_factory, sent):
+    return TestClient(app)
 
 
 def login(client, username, password):
     r = client.post("/api/v1/auth/login", json={"username": username, "password": password})
-    assert r.status_code == 200, r.json
-    return {"Authorization": f"Bearer {r.json['access_token']}"}
+    assert r.status_code == 200, r.json()
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 @pytest.fixture
@@ -69,5 +85,5 @@ def admin(client):
 @pytest.fixture
 def user(client, admin):
     r = client.post("/api/v1/users", json={"username": "ivan", "password": "ivan12345"}, headers=admin)
-    assert r.status_code == 201, r.json
+    assert r.status_code == 201, r.json()
     return login(client, "ivan", "ivan12345")
