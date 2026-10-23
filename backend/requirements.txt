@@ -1,0 +1,11 @@
+flask
+flask-sqlalchemy
+flask-migrate
+flask-cors
+psycopg[binary]
+python-dotenv
+gunicorn
+pydantic
+pydantic-settings
+pyjwt
+bcrypt
