@@ -1,12 +1,109 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
-  </head>
-  <body class="bg-slate-900">
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Keeper</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div class="wrapper">
+        <header class="container header">
+            <span class="logo">Invoice Keeper</span>
+            <nav>
+                <ul>
+                    <li id="logout-btn" class="hidden"><a href="#" onclick="logout(event)">Выйти</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <div class="hero container" id="login-screen">
+            <div class="login-box">
+                <h2>Добро пожаловать</h2>
+                <h1>Вход в систему</h1>
+                
+                <div class="login-form">
+                    <input type="text" id="login" placeholder="Логин" class="input-field">
+                    <input type="password" id="password" placeholder="Пароль" class="input-field">
+                    <button class="btn btn-full" onclick="handleLogin()">Войти</button>
+                    <p id="login-error" class="error-text hidden">Неверный логин или пароль</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="container dashboard-container hidden" id="dashboard-screen">
+            
+            <div class="dashboard-header">
+                <h2>Мои платежи</h2>
+                <button id="add-payment-btn" class="btn hidden" onclick="openModal()">+ Добавить платеж</button>
+            </div>
+
+            <div class="work blocks summary-cards">
+                <div class="block summary-card">
+                    <span class="badge green">RUB</span>
+                    <h3 id="sum-rub" class="summary-amount">0 ₽</h3>
+                    <p>Итого к оплате</p>
+                </div>
+                <div class="block summary-card">
+                    <span class="badge purple">USD</span>
+                    <h3 id="sum-usd" class="summary-amount">$0</h3>
+                    <p>Итого к оплате</p>
+                </div>
+                <div class="block summary-card">
+                    <span class="badge brown">EUR</span>
+                    <h3 id="sum-eur" class="summary-amount">€0</h3>
+                    <p>Итого к оплате</p>
+                </div>
+            </div>
+
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Сумма</th>
+                            <th>Срок</th>
+                            <th>Статус</th>
+                            <th>Действие</th>
+                        </tr>
+                    </thead>
+                    <tbody id="payments-table-body">
+
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Новый платеж</h3>
+            
+            <div class="form-group">
+                <input type="text" id="new-name" placeholder="Название (Аренда)" class="input-field">
+            </div>
+            <div class="form-group">
+                <input type="number" id="new-amount" placeholder="Сумма" class="input-field">
+            </div>
+            <div class="form-group">
+                <select id="new-currency" class="input-field">
+                    <option value="RUB">RUB</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <input type="date" id="new-date" class="input-field">
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn" onclick="createPayment()">Сохранить</button>
+                <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="scripts.js"></script>
+</body>
 </html>
