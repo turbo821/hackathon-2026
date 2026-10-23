@@ -1,6 +1,15 @@
-"""Отправка сообщений в Telegram через Bot API."""
+"""Отправка сообщений в Telegram через Bot API — ЗАГЛУШКА этапа «каркас».
 
-import requests
+Проверка настройки (is_configured) уже рабочая: она нужна, чтобы health-check
+и worker понимали, настроен ли бот. Сама отправка — следующий этап.
+
+Что здесь должно быть (правила из кейса):
+
+- минимум за REMINDER_DAYS_BEFORE (3) дня до срока;
+- только неоплаченные периоды активных платежей;
+- без дублей: период «захватывается» атомарным UPDATE ... WHERE reminder_sent_at IS NULL;
+- добавили платёж позже, чем за 3 дня до срока → напоминание сразу.
+"""
 
 from app.config import settings
 from app.logging_config import get_logger
@@ -15,26 +24,16 @@ class TelegramNotConfigured(RuntimeError):
 
 
 def is_configured() -> bool:
+    """Настроен ли бот: есть и токен, и чат."""
     return bool(settings.telegram_bot_token and settings.telegram_chat_id)
 
 
 def send_message(text: str, chat_id: str | None = None) -> dict:
-    """Отправляет HTML-сообщение. Бросает исключение при ошибке."""
+    """Отправляет HTML-сообщение в чат. Бросает исключение при ошибке."""
+    # TODO(каркас → реализация): POST на Bot API, разобрать ответ, не писать токен в лог.
     if not is_configured():
         raise TelegramNotConfigured("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID не заданы в .env")
-
-    response = requests.post(
-        API_URL.format(token=settings.telegram_bot_token),
-        json={
-            "chat_id": chat_id or settings.telegram_chat_id,
-            "text": text,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        },
-        timeout=10,
+    raise NotImplementedError(
+        "Отправка в Telegram ещё не реализована — это этап «каркас». "
+        "Реализация: POST api.telegram.org/bot<token>/sendMessage, parse_mode=HTML."
     )
-    data = response.json() if response.content else {}
-    if not response.ok or not data.get("ok"):
-        # Токен в лог не пишем: только описание ошибки от Telegram
-        raise RuntimeError(f"Telegram API {response.status_code}: {data.get('description')}")
-    return data
