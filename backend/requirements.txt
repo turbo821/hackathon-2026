@@ -2,10 +2,14 @@ flask
 flask-sqlalchemy
 flask-migrate
 flask-cors
-psycopg[binary]
+flask-smorest
+marshmallow
 python-dotenv
 gunicorn
 pydantic
 pydantic-settings
 pyjwt
 bcrypt
+requests
+tzdata
+pytest
