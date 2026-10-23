@@ -1,4 +1,5 @@
 import './index.css'
-import { renderHome } from './pages/home.js'
 
-renderHome(document.querySelector('#app'))
+import { startRouter } from './router.js'
+
+startRouter(document.querySelector('#app'))
