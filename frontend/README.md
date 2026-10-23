@@ -1,16 +1,49 @@
-# React + Vite
+# Invoice Keeper — frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Чистый JavaScript + Vite + Tailwind CSS v4 + Axios. Фреймворка нет: компонент — это функция, которая возвращает DOM-элемент, страница — функция `renderXxx(container)`.
 
-Currently, two official plugins are available:
+```bash
+npm install
+npm run dev      # http://localhost:5173, backend должен работать на :5000
+npm run build    # сборка в dist/
+npm run lint
+```
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Адрес API — `VITE_API_URL` (по умолчанию `http://localhost:5000/api/v1`).
 
-## React Compiler
+## Структура
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```
+src/
+├── main.js               # точка входа
+├── router.js             # hash-роутер: #/, #/recurring, #/users, #/audit, #/login
+├── index.css             # Tailwind + дизайн-токены (@theme) и утилиты btn-*, field, label
+├── api/
+│   ├── client.js         # axios: токен в заголовке, 401 → экран входа, тексты ошибок
+│   └── endpoints.js      # все запросы к API в одном месте
+├── state/session.js      # токен (localStorage) и текущий пользователь
+├── utils/
+│   ├── dom.js            # h(tag, attrs, ...children) — сборка DOM без innerHTML
+│   └── format.js         # деньги, даты, склонения
+├── components/
+│   ├── Layout.js         # шапка, навигация, пустые состояния, загрузка, ошибки
+│   ├── Button.js         # кнопки и состояние «Сохраняем…»
+│   ├── Modal.js          # модалка и confirmDialog
+│   ├── Toast.js          # уведомления
+│   ├── PaymentState.js   # отрывной календарь со сроком, бейдж состояния
+│   └── PaymentForms.js   # «Новый платёж», «Отметить оплату», «Исправить дату»
+└── pages/
+    ├── login.js
+    ├── payments.js       # главная: итоги по валютам, фильтры, к оплате и история
+    ├── recurring.js      # регулярные платежи (админ)
+    ├── users.js          # пользователи (админ)
+    └── audit.js          # журнал действий (админ)
+```
 
-## Expanding the Oxlint configuration
+## Правила
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+- Данные с сервера выводим только через `h()` / `textContent`, не через `innerHTML`.
+- Запросы — только через `api/endpoints.js`.
+- Цвета и шрифт берём из токенов: `bg-paper`, `text-ink`, `text-muted`, `border-line`, `bg-accent`, `text-overdue`, `bg-paid-soft` и т.д.
+- Новая страница: файл в `pages/`, строка в `ROUTES` в `router.js`, при необходимости пункт в `NAV` в `components/Layout.js`.
+- Права проверяет backend; в интерфейсе админские разделы просто скрыты у пользователя.

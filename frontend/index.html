@@ -3,10 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Invoice Keeper</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
   </head>
-  <body class="bg-slate-900">
+  <body class="bg-paper text-ink font-sans antialiased">
     <div id="app"></div>
+    <div id="modal-root"></div>
+    <div id="toast-root" aria-live="polite" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2"></div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

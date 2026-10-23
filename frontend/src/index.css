@@ -1,1 +1,92 @@
 @import "tailwindcss";
+
+/* Дизайн-токены. Используются как обычные классы Tailwind: bg-paper, text-ink, border-line… */
+@theme {
+  --font-sans: "Onest", ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #f2f4f7;
+  --color-surface: #ffffff;
+  --color-ink: #172033;
+  --color-muted: #5b667a;
+  --color-line: #dce1e8;
+  --color-accent: #2b4fd8;
+  --color-accent-dark: #1f3aa8;
+
+  /* Состояния периода */
+  --color-overdue: #b42318;
+  --color-overdue-soft: #fdecea;
+  --color-pending: #8a5300;
+  --color-pending-soft: #fff3d6;
+  --color-paid: #1f7a4d;
+  --color-paid-soft: #e3f4ea;
+}
+
+@layer base {
+  html {
+    font-feature-settings: "tnum" 1; /* суммы и даты ровными колонками */
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  input,
+  select {
+    font: inherit;
+  }
+}
+
+@utility field {
+  @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-ink placeholder:text-muted/70 focus:border-accent focus:outline-none;
+}
+@utility label {
+  @apply mb-1 block text-sm font-medium text-muted;
+}
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-accent text-white hover:bg-accent-dark;
+}
+@utility btn-ghost {
+  @apply btn border border-line bg-surface text-ink hover:border-ink/40;
+}
+@utility btn-danger {
+  @apply btn border border-overdue/30 bg-surface text-overdue hover:bg-overdue-soft;
+}
+
+/* Отрывной календарь — главный визуальный элемент строки платежа */
+.date-block {
+  width: 3.5rem;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  text-align: center;
+  flex-shrink: 0;
+}
+.date-block__strip {
+  height: 0.4rem;
+}
+.date-block__day {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  padding-top: 0.2rem;
+}
+.date-block__month {
+  font-size: 0.7rem;
+  color: var(--color-muted);
+  padding-bottom: 0.3rem;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .modal-panel {
+    animation: modal-in 160ms ease-out;
+  }
+  @keyframes modal-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+}
