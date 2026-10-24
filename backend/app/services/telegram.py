@@ -158,7 +158,9 @@ def get_updates(
         payload["offset"] = offset
     if allowed_updates is not None:
         payload["allowed_updates"] = json.dumps(allowed_updates)
-    result = _call("getUpdates", payload)
+    # HTTP-таймаут должен быть больше таймаута long polling: иначе Telegram
+    # держит запрос дольше, чем httpx готов ждать, и рвёт соединение.
+    result = _call("getUpdates", payload, timeout=timeout + 15)
     return result if isinstance(result, list) else []
 
 
