@@ -41,75 +41,105 @@ img {
     padding: 0 20px;
 }
 
-
 .header {
-    padding: 50px 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 25px 0;
+    border-bottom: 1px solid #1a1410;
+    margin-bottom: 30px;
 }
 
 .logo {
     text-transform: uppercase;
-    font-size: 29px;
+    font-size: 24px;
     font-weight: 800;
     color: #fff;
 }
 
-.header nav ul{
-    list-style: none;
+#main-nav {
     display: flex;
+    align-items: center;
+    flex: 1;
+    margin-left: 50px;
+}
+
+#main-nav ul {
+    display: flex;
+    list-style: none;
     gap: 30px;
+    margin: 0;
+    padding: 0;
 }
 
-.header nav ul li a{
-    color: #fff;
+.nav-link {
+    color: #898989;
+    font-size: 15px;
     font-weight: 500;
-    transition: color 300ms ease;
+    padding: 5px 0;
+    transition: color 0.3s ease;
+    position: relative;
 }
 
-.header nav ul li a:hover {
-    color: #FA9021;
-}
-/* Стиль для кнопки Telegram */
-.telegram {
-    background: #0088CC;
+.nav-link:hover {
     color: #fff;
-    text-align: center;
-    text-decoration: none;
-    display: block;
+}
+
+.nav-link.active {
+    color: #fff;
+}
+
+.nav-link.active::after {
+    content: '';
+    position: absolute;
+    bottom: -5px;
+    left: 0;
     width: 100%;
-    margin-top: 10px;
-    border-radius: 50px;
-    padding: 15px 30px;
-    border: 0;
-    transition: all 500ms ease;
-    font-size: 18px;
-    font-family: 'Poppins', sans-serif;
-    cursor: pointer;
-    font-weight: 500;
+    height: 2px;
+    background: #FA8305;
+    border-radius: 2px;
 }
 
-.telegram:hover {
-    background: #0077b3;
-    transform: scale(1.05);
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto;
 }
+
+#user-role {
+    color: #FA8305;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+#logout-btn {
+    color: #898989;
+    font-size: 15px;
+    transition: color 0.3s;
+}
+
+#logout-btn:hover {
+    color: #ff4d4d;
+}
+
 .btn {
     background: #FA8305;
     color: #fff;
     border-radius: 50px;
-    padding: 15px 30px;
+    padding: 12px 25px;
     border: 0;
-    transition: all 500ms ease;
-    font-size: 18px;
+    transition: all 300ms ease;
+    font-size: 16px;
     font-family: 'Poppins', sans-serif;
     cursor: pointer;
     font-weight: 500;
+    display: inline-block;
 }
 
 .btn:hover {
     background: #DC7000;
-    transform: scale(1.05);
+    transform: translateY(-2px);
 }
 
 .btn:disabled {
@@ -123,11 +153,31 @@ img {
 }
 
 .btn-secondary {
-    background: #555;
+    background: #333;
 }
 
 .btn-secondary:hover {
     background: #444;
+}
+
+.telegram {
+    background: #0088CC;
+    color: #fff;
+    text-align: center;
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 50px;
+    padding: 12px 30px;
+    border: 0;
+    transition: all 300ms ease;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.telegram:hover {
+    background: #0077b3;
+    transform: translateY(-2px);
 }
 
 .input-field {
@@ -135,7 +185,7 @@ img {
     background: #1C140F;
     color: #fff;
     border: 1px solid #333;
-    border-radius: 5px;
+    border-radius: 8px;
     padding: 15px 20px;
     font-family: 'Poppins', sans-serif;
     font-size: 16px;
@@ -151,7 +201,6 @@ img {
     color: #898989;
 }
 
-/* Убираем стрелочки у поля ввода суммы */
 input[type=number]::-webkit-inner-spin-button, 
 input[type=number]::-webkit-outer-spin-button { 
     -webkit-appearance: none; 
@@ -161,9 +210,6 @@ input[type=number] {
     -moz-appearance: textfield;
 }
 
-/* =========================================
-   ЭКРАН ЛОГИНА
-   ========================================= */
 #login-screen {
     display: flex;
     justify-content: center;
@@ -174,42 +220,49 @@ input[type=number] {
 .login-box {
     width: 100%;
     max-width: 400px;
-    margin: 100px auto;
+    margin: 50px auto;
+    background: #1c140f;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
 }
 
 .login-box h2 {
-    color: #E87D0E;
-    font-size: 20px;
+    color: #FA8305;
+    font-size: 18px;
     font-weight: 600;
     text-align: center;
 }
 
 .login-box h1 {
-    font-size: 30px;
+    font-size: 28px;
     font-weight: 600;
     margin-bottom: 30px;
     text-align: center;
 }
 
 .login-form {
-    margin-top: 20px;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 15px;
 }
 
 .error-text {
     color: #ff4d4d;
-    margin-top: 10px;
+    margin-top: 5px;
     text-align: center;
+    font-size: 14px;
 }
 
-/* =========================================
-   ДАШБОРД
-   ========================================= */
 .dashboard-container {
-    padding-top: 50px;
+    padding-top: 20px;
     padding-bottom: 100px;
+    animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .dashboard-header {
@@ -219,7 +272,11 @@ input[type=number] {
     margin-bottom: 30px;
 }
 
-/* Блок с итогами */
+.dashboard-header h2 {
+    font-size: 24px;
+    font-weight: 600;
+}
+
 .summary-cards {
     display: flex;
     gap: 20px;
@@ -231,22 +288,78 @@ input[type=number] {
     flex: 1;
     min-width: 250px;
     background: #1c140f;
-    border-radius: 10px;
-    padding: 30px;
-    border-left: 5px solid #FA8305;
+    border-radius: 12px;
+    padding: 25px;
+    border-left: 4px solid #FA8305;
+    transition: transform 0.3s ease;
+}
+
+.summary-card:hover {
+    transform: translateY(-5px);
 }
 
 .summary-amount {
-    margin-top: 15px;
-    font-size: 24px;
+    margin-top: 10px;
+    font-size: 28px;
     font-weight: 700;
 }
 
-/* Таблица */
+.summary-card p {
+    color: #898989;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.badge.green { background: #1b4d2e; }
+.badge.purple { background: #3b1b4d; }
+.badge.brown { background: #4d2e1b; }
+
+/* Стили для фильтров над таблицей */
+.filters-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    background: transparent;
+    color: #898989;
+    border: 1px solid #333;
+    border-radius: 50px;
+    padding: 8px 20px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 300ms ease;
+}
+
+.filter-btn:hover {
+    background: #1c140f;
+    color: #fff;
+    border-color: #555;
+}
+
+.filter-btn.active {
+    background: #FA8305;
+    color: #fff;
+    border-color: #FA8305;
+}
+
 .table-container {
     background: #1c140f;
     padding: 20px;
-    border-radius: 10px;
+    border-radius: 12px;
     overflow-x: auto;
 }
 
@@ -259,10 +372,12 @@ table {
 
 table th {
     padding: 15px 10px;
-    border-bottom: 2px solid #333;
-    color: #FA8305;
-    font-size: 14px;
+    border-bottom: 1px solid #333;
+    color: #898989;
+    font-size: 12px;
+    font-weight: 600;
     text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 table td {
@@ -275,10 +390,9 @@ table tr:last-child td {
     border-bottom: none;
 }
 
-/* Статусы */
 .status {
     display: inline-block;
-    padding: 5px 12px;
+    padding: 6px 14px;
     border-radius: 20px;
     font-size: 12px;
     font-weight: 600;
@@ -310,20 +424,27 @@ table tr:last-child td {
     z-index: 100;
     justify-content: center;
     align-items: center;
+    backdrop-filter: blur(5px);
 }
 
 .modal-content {
     background: #1c140f;
     padding: 40px;
-    border-radius: 10px;
+    border-radius: 12px;
     width: 100%;
     max-width: 450px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+    animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
 }
 
 .modal-content h3 {
     margin-bottom: 20px;
-    font-size: 24px;
+    font-size: 22px;
     color: #FA8305;
 }
 
@@ -334,7 +455,7 @@ table tr:last-child td {
 .modal-actions {
     display: flex;
     gap: 10px;
-    margin-top: 25px;
+    margin-top: 30px;
 }
 
 .modal-actions .btn {
@@ -343,13 +464,41 @@ table tr:last-child td {
     font-size: 16px;
 }
 
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.3s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+}
+
 @media (max-width: 768px) {
     .header {
         flex-direction: column;
         gap: 20px;
-        padding: 30px 0;
+        padding: 20px 0;
     }
     
+    #main-nav {
+        margin-left: 0;
+        width: 100%;
+        justify-content: space-between;
+    }
+    
+    #main-nav ul {
+        gap: 15px;
+    }
+    
+    .nav-right {
+        margin-left: 0;
+        margin-top: 10px;
+        width: 100%;
+        justify-content: flex-end;
+    }
+
     .summary-cards {
         flex-direction: column;
     }
