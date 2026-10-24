@@ -14,8 +14,6 @@ AssignableRole = Literal["admin", "user"]
 
 def _check_username(value: str) -> str:
     value = value.strip()
-    if not USERNAME_RE.match(value):
-        raise ValueError("Логин: 3–64 символа, латиница, цифры, точка, дефис, подчёркивание")
     return value
 
 
