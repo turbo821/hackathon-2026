@@ -16,7 +16,12 @@ services:
 
   # Панель
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        # Реестр npm для сборки. Меняется в .env: NPM_REGISTRY=...
+        # Нужен там, где официальный реестр недоступен (IPv4 до Cloudflare закрыт).
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     env_file: .env
     ports:
       - "5173:5173"
