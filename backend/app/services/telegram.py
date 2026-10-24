@@ -38,7 +38,9 @@ def is_configured() -> bool:
     return bool(settings.telegram_bot_token and settings.telegram_chat_id)
 
 
-def _call(method: str, payload: dict | None = None, timeout: int = TIMEOUT) -> dict | list:
+def _call(
+    method: str, payload: dict | None = None, timeout: int = TIMEOUT
+) -> dict | list:
     """Один вызов Bot API. Бросает TelegramError с описанием от Telegram."""
     if not has_token():
         raise TelegramNotConfigured("TELEGRAM_BOT_TOKEN не задан в .env")
@@ -55,7 +57,9 @@ def _call(method: str, payload: dict | None = None, timeout: int = TIMEOUT) -> d
 
     if not data.get("ok"):
         # Токен в лог не пишем: только код и описание ошибки
-        raise TelegramError(f"Telegram API {response.status_code}: {data.get('description')}")
+        raise TelegramError(
+            f"Telegram API {response.status_code}: {data.get('description')}"
+        )
     return data.get("result")
 
 
@@ -124,7 +128,10 @@ def edit_message_text(
 
 def answer_callback(callback_id: str, text: str = "") -> dict:
     """Отвечает на нажатие кнопки (всплывающее уведомление в Telegram)."""
-    return _call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text}) or {}
+    return (
+        _call("answerCallbackQuery", {"callback_query_id": callback_id, "text": text})
+        or {}
+    )
 
 
 def get_updates(offset: int | None = None, timeout: int = 25) -> list[dict]:

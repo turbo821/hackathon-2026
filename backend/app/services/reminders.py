@@ -9,9 +9,10 @@
 """
 
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -19,6 +20,7 @@ from app.logging_config import get_logger
 from app.models import PaymentOccurrence, RecurringPayment
 from app.models.payment_occurrence import STATUS_UNPAID
 from app.services.periods import ensure_all_occurrences
+from app.services.recipients import email_recipients
 from app.services.remind_channels import smtp, telegram
 from app.timeutils import today, utcnow
 
@@ -47,12 +49,17 @@ def _due_occurrences_query(on: date):
 
 
 def _claim(db: Session, occ_id: int) -> bool:
-    result = db.execute(
-        update(PaymentOccurrence)
-        .where(
-            PaymentOccurrence.id == occ_id, PaymentOccurrence.reminder_sent_at.is_(None)
-        )
-        .values(reminder_sent_at=utcnow())
+    # Для UPDATE execute() отдаёт CursorResult — именно у него есть rowcount
+    result = cast(
+        CursorResult[Any],
+        db.execute(
+            update(PaymentOccurrence)
+            .where(
+                PaymentOccurrence.id == occ_id,
+                PaymentOccurrence.reminder_sent_at.is_(None),
+            )
+            .values(reminder_sent_at=utcnow())
+        ),
     )
     db.commit()
     return result.rowcount == 1
@@ -95,6 +102,10 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
         return 0
 
     sent = 0
+    # Получатели писем — все адреса из базы. Собираем один раз на проверку,
+    # а не на каждый период.
+    recipients = email_recipients(db)
+
     for occ in occurrences:
         occ_id, name, due = occ.id, occ.name, occ.due_date
 
@@ -118,15 +129,21 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
         # Пытаемся отправить через все доступные каналы
         for channel, text in messages:
             try:
-                channel.send_message(text, reply_markup=_reply_markup(channel, occ_id))
-                success = True
-            except NotImplementedError:
-                # Канал ещё не дописан — молчаливый «успех» здесь был бы хуже:
-                # период считался бы отправленным, и напоминание потерялось бы.
-                logger.warning(
-                    f"Канал {channel.__name__} ещё не дописан — "
-                    f"напоминание по периоду #{occ_id} в него не ушло"
+                delivered = channel.send_message(
+                    text,
+                    reply_markup=_reply_markup(channel, occ_id),
+                    recipients=recipients,
                 )
+                if delivered:
+                    success = True
+                else:
+                    # Канал отработал, но ничего не доставил (например, в почте
+                    # нет ни одного получателя). Успехом это считать нельзя:
+                    # иначе упавший Telegram-канал замаскируется «пустым» SMTP.
+                    logger.warning(
+                        f"Канал {channel.__name__} ничего не доставил "
+                        f"по периоду #{occ_id}"
+                    )
             except Exception:
                 logger.exception(
                     f"Не удалось отправить напоминание по периоду #{occ_id} "

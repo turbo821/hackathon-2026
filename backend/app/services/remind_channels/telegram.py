@@ -26,6 +26,12 @@ def build_message(occ: PaymentOccurrence, on: date) -> str:
     )
 
 
-def send_message(text: str, reply_markup: dict | None = None) -> None:
-    # Вызываем ваш существующий клиент Telegram
+def send_message(
+    text: str,
+    reply_markup: dict | None = None,
+    recipients: list[str] | None = None,
+) -> int:
+    # Вызываем ваш существующий клиент Telegram.
+    # recipients игнорируем: у Telegram один чат из .env, а не список адресов.
     telegram_client.send_message(text, reply_markup=reply_markup)
+    return 1

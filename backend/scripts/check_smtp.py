@@ -101,18 +101,43 @@ def check_connection() -> tuple[bool, str]:
         return False, f"не удалось подключиться: {type(e).__name__}: {e}"
 
 
-def send_test(to: str) -> tuple[bool, str]:
-    """Отправляет тестовое письмо рабочим кодом приложения."""
+def send_test(addresses: list[str]) -> tuple[bool, str]:
+    """Отправляет тестовое письмо рабочим кодом приложения — по одному на адрес."""
     try:
-        from app.services.remind_channels.smtp import _send_message_to
+        from app.services.remind_channels.smtp import send_message
 
-        _send_message_to(
-            to,
+        delivered = send_message(
             "<h3>Проверка SMTP</h3><p>Тестовое письмо. Если вы его видите — настройки рабочие.</p>",
+            recipients=addresses,
         )
-        return True, f"письмо отправлено на {to}"
+        if not delivered:
+            return False, f"доставлено 0 из {len(addresses)}"
+        return True, f"доставлено {delivered} из {len(addresses)}"
     except Exception as e:
         return False, f"не удалось отправить: {type(e).__name__}: {e}"
+
+
+def show_recipients() -> None:
+    """Показывает, кому пойдут реальные напоминания."""
+    try:
+        from app.db import SessionLocal
+        from app.services.recipients import email_recipients
+
+        db = SessionLocal()
+        try:
+            recipients = email_recipients(db)
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"Получатели: не удалось прочитать базу ({type(e).__name__}: {e})")
+        return
+
+    if recipients:
+        print("Получатели напоминаний из базы:")
+        for address in recipients:
+            print(f"  - {address}")
+    else:
+        print("Получатели напоминаний из базы: пусто — письма уходить некому")
 
 
 def main() -> int:
@@ -122,7 +147,11 @@ def main() -> int:
     parser.add_argument(
         "--to",
         metavar="ADDRESS",
-        help="адрес, куда отправить тестовое письмо (по умолчанию письмо не отправляется)",
+        nargs="+",
+        help=(
+            "адреса, куда отправить тестовое письмо — по одному письму на адрес, "
+            "как в реальной рассылке (по умолчанию письма не отправляются)"
+        ),
     )
     args = parser.parse_args()
 
@@ -144,9 +173,11 @@ def main() -> int:
     ok, message = check_connection()
     print(f"Подключение: {'OK' if ok else 'FAIL'} — {message}")
 
+    show_recipients()
+
     if ok and args.to:
         sent, send_message = send_test(args.to)
-        print(f"Тестовое письмо: {'OK' if sent else 'FAIL'} — {send_message}")
+        print(f"Тестовые письма: {'OK' if sent else 'FAIL'} — {send_message}")
 
     if not ok or problems:
         print()
@@ -162,7 +193,10 @@ def main() -> int:
     print()
     print("Настройки SMTP выглядят рабочими.")
     if not args.to:
-        print("Отправить тестовое письмо: python -m scripts.check_smtp --to <адрес>")
+        print(
+            "Отправить тестовое письмо: python -m scripts.check_smtp --to <адрес>\n"
+            "Проверить массовую рассылку: python -m scripts.check_smtp --to <адрес1> <адрес2> ..."
+        )
     return 0
 
 
