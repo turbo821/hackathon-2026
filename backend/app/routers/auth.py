@@ -16,15 +16,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post(
     "/login",
     response_model=TokenOut,
-    summary="Вход по логину и паролю",
-    responses={401: {"description": "Неверный логин или пароль"}},
+    summary="Вход по email и паролю",
+    responses={401: {"description": "Неверный email или пароль"}},
 )
 def login(data: LoginIn, db: DB):
     """Возвращает JWT. Дальше передавайте его в заголовке `Authorization: Bearer <token>`."""
-    username = data.username.strip()
-    user = db.scalars(select(User).where(User.username == username)).first()
+    user = db.scalars(select(User).where(User.email == data.email)).first()
     if user is None or not verify_password(data.password, user.password_hash):
-        raise ApiError(401, "Неверный логин или пароль")
+        raise ApiError(401, "Неверный email или пароль")
 
     token, expires_at = create_access_token(user.id)
     return {"access_token": token, "token_type": "Bearer", "expires_at": expires_at, "user": user}

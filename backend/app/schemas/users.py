@@ -80,8 +80,14 @@ class UserUpdate(Schema):
 
 
 class LoginIn(Schema):
-    username: str = Field(examples=["admin"])
+    email: str = Field(examples=["admin@example.com"])
     password: str = Field(examples=["admin"])
+
+    @field_validator("email")
+    @classmethod
+    def v_email(cls, v: str) -> str:
+        # Без проверки формата: неверный email — это просто «неверный логин или пароль»
+        return v.strip().lower()
 
 
 class TokenOut(Schema):
