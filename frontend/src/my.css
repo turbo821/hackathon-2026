@@ -169,26 +169,96 @@ img {
     background: #7f1d1d;
 }
 
-.telegram {
-    background: #0088CC;
-    color: #fff;
-    text-align: center;
-    display: block;
-    width: 100%;
-    margin-top: 10px;
-    border-radius: 50px;
-    padding: 12px 30px;
-    border: 0;
-    transition: all 300ms ease;
-    font-size: 16px;
-    font-weight: 500;
-}
 
-.telegram:hover {
-    background: #0077b3;
+.telegram-img:hover {
+    transition: all 300ms ease;
     transform: translateY(-2px);
 }
 
+.telegram-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+
+.telegram-link:hover {
+    transform: scale(1.1);
+}
+
+
+/* Стили для ссылки с иконкой Telegram в шапке */
+.telegram-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+}
+
+.telegram-link:hover {
+    transform: scale(1.1);
+}
+
+/* Стили для самой иконки */
+.telegram-img {
+    width: 24px;       /* Размер иконки */
+    height: 24px;
+    object-fit: contain;
+}
+
+/* Настройка отступов в правой части шапки, чтобы всё было в ряд */
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;         /* Расстояние между иконкой, ролью и кнопкой "Выйти" */
+    margin-left: auto;
+}
+
+/* Стили для роли и кнопки выйти, чтобы они были на одной линии с иконкой */
+#user-role {
+    color: #FA8305;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;    /* Убирает лишнюю высоту строки */
+}
+
+#logout-btn {
+    color: #898989;
+    font-size: 15px;
+    transition: color 0.3s;
+    line-height: 1;
+}
+
+#logout-btn:hover {
+    color: #ff4d4d;
+}
+
+/* Настройка отступов в правой части шапки, чтобы всё было в ряд */
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 20px;         /* Расстояние между иконкой, ролью и кнопкой "Выйти" */
+    margin-left: auto;
+}
+
+/* Стили для роли и кнопки выйти, чтобы они были на одной линии с иконкой */
+#user-role {
+    color: #FA8305;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;    /* Убирает лишнюю высоту строки */
+}
+
+#logout-btn {
+    color: #898989;
+    font-size: 15px;
+    transition: color 0.3s;
+    line-height: 1;
+}
+
+#logout-btn:hover {
+    color: #ff4d4d;
+}
 .input-field {
     width: 100%;
     background: #1C140F;

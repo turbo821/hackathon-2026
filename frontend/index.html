@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice Keeper</title>
-    <link rel="stylesheet" href="/src/my.css">
+    <title <link type="image/png" sizes="96x96" rel="icon" href=".../icons8-монеты-ios_filled-96.png">Invoice Keeper</title>
+    <link rel="stylesheet" href="src/my.css">
+    <link rel="shortcut icon" href="images/icons8-монеты-96.png" type="image/x-icon">
+
 </head>
 <body>
     <div class="wrapper">
@@ -19,6 +22,9 @@
                 </ul>
 
                 <div class="nav-right">
+                    <a href="https://t.me/+L3md-k-VAcswMzhi" target="_blank" class="telegram-link">
+                        <img src="/src/img/telegram.png" alt="Telegram" class="telegram-img">
+                    </a>
                     <span id="user-role" class="hidden"></span>
                     <a href="#" id="logout-btn" class="hidden" onclick="logout(event)">Выйти</a>
                 </div>
@@ -130,7 +136,7 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Логин</th>
+                                <th>ФИО</th>
                                 <th>Почта</th>
                                 <th>Роль</th>
                                 <th>Создан</th>
@@ -186,7 +192,7 @@
             <h3 id="user-modal-title">Новый пользователь</h3>
 
             <div class="form-group">
-                <input type="text" id="new-user-name" placeholder="Логин (латиница, цифры, . _ -)" class="input-field" autocomplete="off">
+                <input type="text" id="new-user-name" placeholder="ФИО" class="input-field" autocomplete="off">
             </div>
             <div class="form-group">
                 <input type="email" id="new-user-email" placeholder="Почта" class="input-field" autocomplete="off">
@@ -208,6 +214,18 @@
         </div>
     </div>
 
-    <script type="module" src="/src/scripts.js"></script>
+    <!-- Кастомное окно подтверждения удаления/прекращения -->
+    <div id="confirm-modal" class="modal-overlay confirm-overlay hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+        <div class="modal-content confirm-content">
+            <h3 id="confirm-title">Подтвердите действие</h3>
+            <p id="confirm-message" class="confirm-message"></p>
+            <div class="modal-actions confirm-actions">
+                <button id="confirm-cancel" type="button" class="btn btn-secondary">Отмена</button>
+                <button id="confirm-accept" type="button" class="btn btn-danger-solid">Удалить</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="src/scripts.js"></script>
 </body>
 </html>
