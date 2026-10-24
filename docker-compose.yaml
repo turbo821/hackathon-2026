@@ -1,59 +1,25 @@
 services:
   # Прокси для исходящих соединений контейнеров.
+  # Нужен там, где из Docker не достучаться до Telegram и npm-реестра
+  # (например, IPv4 к Cloudflare закрыт, а у контейнеров нет IPv6).
   #
-  # Схема: контейнеры -> xray (SOCKS5/HTTP на 1080/8080) -> интернет.
-  # xray резолвит домены сам и берёт только IPv4: без этого Telegram
-  # отдаёт IPv6-адрес, который дальше по цепочке отклоняется (socks5 code=4).
+  # network_mode: host — контейнер делит сетевой стек с хостом, поэтому
+  # его исходящие соединения идут по маршрутам хоста (в том числе через WARP).
+  # Порт 1080 слушается на хосте, контейнеры видят его как
+  # host.docker.internal:1080 (адрес docker0, 172.17.0.1).
   #
-  # Порт xray опубликован только на 127.0.0.1 сервера — снаружи (в интернет)
-  # прокси не видно. Из контейнеров к нему идут по имени сервиса `xray`.
-  #
-  # Если на сервере поднят Cloudflare WARP в режиме туннеля
-  # (`warp-cli --accept-tos mode warp && warp-cli --accept-tos connect`),
-  # трафик контейнеров уходит на хост и дальше в туннель WARP.
-  xray:
-    image: ghcr.io/xtls/xray-core:latest
-    container_name: xray-proxy
+  # Включается профилем: docker compose --profile proxy up -d
+  # Без профиля сервисы работают как обычно (PROXY_URL пустой — прокси нет).
+  proxy:
+    image: serjs/go-socks5-proxy:latest
+    network_mode: host
+    profiles: ["proxy"]
     restart: unless-stopped
-    command: ["run", "-config", "/etc/xray/config.json"]
-    # Порт наружу не публикуется: прокси нужен только внутри compose-сети
-    # (контейнеры ходят в него по имени сервиса `xray`), а свободный порт
-    # 1080 на сервере может быть занят — и тогда стек не поднимется.
-    # Для отладки с самого сервера раскомментируйте:
-    # ports:
-    #   - "127.0.0.1:1080:1080"
-    volumes:
-      - ./xray/config.json:/etc/xray/config.json:ro
-    networks:
-      - app-network
-    # В образе нет shell/nc, поэтому проверяем конфиг самим бинарём xray:
-    # так ловится сломанный или не подхваченный монтированием конфиг.
-    healthcheck:
-      test: ["CMD", "/usr/local/bin/xray", "run", "-test", "-config", "/etc/xray/config.json"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
+    environment:
+      PROXY_USER: ${PROXY_USER:-}
+      PROXY_PASSWORD: ${PROXY_PASSWORD:-}
 
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
-    env_file: .env
-    # Куда dev-сервер проксирует /api — дефолт http://backend:5000 задан
-    # в vite.config.js, поэтому отдельный environment здесь не нужен.
-    ports:
-      - "5173:5173" # Vite dev-сервер: порт внутри тоже 5173
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules # Изоляция node_modules контейнера от хоста
-    depends_on:
-      - backend
-    restart: unless-stopped
-    networks:
-      - app-network
-
+  # API
   backend:
     build: ./backend
     env_file: .env
@@ -62,18 +28,13 @@ services:
     volumes:
       - ./backend:/app
       - backend_data:/app/instance
-    # Исходящие HTTP(S)-запросы (Telegram, внешние API) — через xray.
-    # NO_PROXY оставляет внутренние адреса (свой бэкенд, соседние сервисы)
-    # напрямую, иначе они уедут в прокси и сломаются.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
+      # Исходящие HTTP(S)-запросы (Telegram) — через прокси.
+      # SMTP (Mail.ru) прокси не поддерживает, но он и так доступен напрямую.
       ALL_PROXY: ${PROXY_URL:-}
-      HTTP_PROXY: ${PROXY_URL:-}
-      HTTPS_PROXY: ${PROXY_URL:-}
-      NO_PROXY: localhost,127.0.0.1,::1,backend,frontend,worker,xray
-      BOT_PROXY_URL: ${BOT_PROXY_URL:-}
-      SMTP_PROXY: ${SMTP_PROXY:-}
-    depends_on:
-      - xray
+      NO_PROXY: localhost,127.0.0.1,db,backend,worker,proxy
     restart: unless-stopped
 
   # Панель
@@ -105,13 +66,11 @@ services:
     volumes:
       - ./backend:/app
       - backend_data:/app/instance
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       ALL_PROXY: ${PROXY_URL:-}
-      HTTP_PROXY: ${PROXY_URL:-}
-      HTTPS_PROXY: ${PROXY_URL:-}
-      NO_PROXY: localhost,127.0.0.1,::1,backend,frontend,worker,xray
-      BOT_PROXY_URL: ${BOT_PROXY_URL:-}
-      SMTP_PROXY: ${SMTP_PROXY:-}
+      NO_PROXY: localhost,127.0.0.1,db,backend,worker,proxy
     depends_on:
       - backend
       - xray
