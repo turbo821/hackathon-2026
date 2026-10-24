@@ -2,6 +2,21 @@ const API_URL = 'http://localhost:5000/api/v1';
 let myRole = 'admin'; 
 let globalPayments = []; 
 
+function showToast(message, type = 'success') {
+    const toast = document.createElement('div');
+    toast.className = 'toast' + (type === 'error' ? ' error' : '');
+    toast.textContent = message;
+    document.body.appendChild(toast);
+
+    // даём браузеру отрисовать элемент, чтобы сработал transition
+    requestAnimationFrame(() => toast.classList.add('show'));
+
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
 async function handleLogin() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
@@ -153,7 +168,7 @@ function createPayment() {
     const date = document.getElementById('new-date').value;
 
     if (!name || !amount || !date) {
-        alert('Пожалуйста, заполните все поля!');
+    showToast('Пожалуйста, заполните все поля!', 'error');
         return;
     }
 
@@ -164,10 +179,42 @@ function createPayment() {
         date: date
     };
 
-    alert(`Отправляем POST запрос на создание платежа:\n${JSON.stringify(newPayment, null, 2)}`);
+showToast('Платеж добавлен');
     closeModal();
 }
+function openModal1() {
+    document.getElementById('modal-user').classList.remove('hidden');
+}
 
+function closeModal1() {
+    document.getElementById('modal-user').classList.add('hidden');
+    document.getElementById('new-user-name').value = '';
+    document.getElementById('new-user-email').value = '';
+    document.getElementById('new-user-password').value = '';
+    document.getElementById('new-user-role').value = 'user';
+}
+
+function createUser() {
+    const name = document.getElementById('new-user-name').value.trim();
+    const email = document.getElementById('new-user-email').value.trim();
+    const role = document.getElementById('new-user-role').value;
+    const password = document.getElementById('new-user-password').value;
+
+    if (!name || !email || !password) {
+    showToast('Пожалуйста, заполните все поля!', 'error');
+        return;
+    }
+
+    const newUser = {
+        name: name,
+        email: email,
+        role: role,
+        password: password
+    };
+
+showToast('Пользователь создан');
+    closeModal1();
+}
 function switchTab(tabName, element) {
     const links = document.querySelectorAll('.nav-link');
     links.forEach(link => link.classList.remove('active'));

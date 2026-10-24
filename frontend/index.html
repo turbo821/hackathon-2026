@@ -100,7 +100,7 @@
             <div class="container dashboard-container hidden" id="tab-users">
                 <div class="dashboard-header">
                     <h2>Пользователи</h2>
-                    <button id="add-user-btn" class="btn hidden" onclick="alert('Функционал в разработке')">+ Добавить пользователя</button>
+                    <button id="add-user-btn" class="btn hidden" onclick="openModal1()">+ Добавить пользователя</button>
                 </div>
                 <p style="color: #ccc; margin-top: 20px;">Здесь будет список пользователей системы.</p>
             </div>
@@ -135,7 +135,34 @@
             </div>
         </div>
     </div>
+        <div id="modal-user" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Новый пользователь</h3>
 
+            <div class="form-group">
+                <input type="text" id="new-user-name" placeholder="ФИО" class="input-field">
+            </div>
+            <div class="form-group">
+                <input type="email" id="new-user-email" placeholder="Почта" class="input-field">
+            </div>
+            <div class="form-group">
+                <select id="new-user-role" class="input-field">
+                    <option value="user">Пользователь</option>
+                    <option value="admin">Администратор</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <input type="password" id="new-user-password" placeholder="Пароль" class="input-field">
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn" onclick="createUser()">Сохранить</button>
+                <button class="btn btn-secondary" onclick="closeModal1()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="src/scripts.js"></script>
     <script src="src/scripts.js"></script>
 </body>
 </html>
