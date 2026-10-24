@@ -4,28 +4,28 @@ services:
     container_name: xray-proxy
     restart: unless-stopped
     ports:
-      - "1080:1080"
+      - "1080:1080" # Внешний порт для прокси (при необходимости)
     volumes:
       - ./xray/config.json:/etc/xray/config.json:ro
     networks:
-          - app-network
+      - app-network
 
   frontend:
-      build:
-        context: ./frontend
-        args:
-          NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
-      env_file: .env
-      ports:
-        - "5173:5173"
-      volumes:
-        - ./frontend:/app
-        - /app/node_modules
-      depends_on:
-        - backend
-      restart: unless-stopped
-      networks:
-            - app-network
+    build:
+      context: ./frontend
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
+    env_file: .env
+    ports:
+      - "5173:5173" # Исправлено: если это Vite dev-сервер, порт внутри тоже 5173
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Изоляция node_modules контейнера от хоста
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - app-network
       
   backend:
     build: ./backend
@@ -39,17 +39,19 @@ services:
     depends_on:
       - xray
     networks:
-          - app-network
+      - app-network
   
   worker:
     build: ./backend
     env_file: .env
+    # ВАЖНО: добавьте команду, если воркер должен делать что-то отличное от основного backend
+    # command: celery -A your_app worker --loglevel=info  # Пример для Celery
     depends_on:
       - backend
       - xray
     restart: unless-stopped
     networks:
-          - app-network
+      - app-network
   
 volumes:
   backend_data:
