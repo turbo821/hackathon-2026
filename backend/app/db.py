@@ -3,7 +3,7 @@
 from collections.abc import Iterator
 from pathlib import Path
 
-from sqlalchemy import MetaData, create_engine, event
+from sqlalchemy import MetaData, create_engine, event, inspect
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -60,3 +60,42 @@ def get_db() -> Iterator[Session]:
         yield db
     finally:
         db.close()
+
+
+def schema_drift(target_engine=None) -> tuple[list[str], list[str]]:
+    """Сравнивает схему базы с моделями.
+
+    Возвращает (недостающее, лишнее):
+    - **недостающее** — в базе нет таблицы или колонки, которая есть в моделях.
+      Приложение упадёт на первой же записи (no such column / NOT NULL);
+    - **лишнее** — в базе есть то, чего в моделях нет. На работу не влияет,
+      но значит, что база осталась от прежней версии схемы.
+
+    Нужно потому, что create_all умеет только СОЗДАВАТЬ таблицы: изменили
+    модель — база молча осталась старой, и ошибка всплывает позже и не там,
+    где её искали.
+    """
+    # Модели регистрируются в Base.metadata при импорте пакета app.models.
+    # Импорт внутри функции: app.models импортирует app.db — на уровне модуля
+    # получился бы цикл, а здесь он безопасен.
+    from app import models  # noqa: F401
+
+    inspector = inspect(target_engine or engine)
+    db_tables = set(inspector.get_table_names())
+    meta_tables = set(Base.metadata.tables)
+
+    missing: list[str] = []
+    extra: list[str] = []
+
+    for name in sorted(meta_tables - db_tables):
+        missing.append(f"таблица {name}")
+    for name in sorted(db_tables - meta_tables - {"alembic_version"}):
+        extra.append(f"таблица {name}")
+
+    for name in sorted(meta_tables & db_tables):
+        db_columns = {c["name"] for c in inspector.get_columns(name)}
+        meta_columns = set(Base.metadata.tables[name].columns.keys())
+        missing.extend(f"{name}.{col}" for col in sorted(meta_columns - db_columns))
+        extra.extend(f"{name}.{col}" for col in sorted(db_columns - meta_columns))
+
+    return missing, extra
