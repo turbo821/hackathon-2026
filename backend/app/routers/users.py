@@ -12,7 +12,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 FORBIDDEN = {403: {"description": "Только администратор / учётная запись администратора"}}
 NOT_FOUND = {404: {"description": "Пользователь не найден"}}
-CONFLICT = {409: {"description": "Логин занят"}}
+CONFLICT = {409: {"description": "Логин или email занят"}}
 
 
 def _get_manageable_user(db: Session, user_id: int) -> User:
@@ -36,6 +36,17 @@ def _ensure_username_free(db: Session, username: str, exclude_id: int | None = N
         raise ApiError(409, "Пользователь с таким логином уже существует")
 
 
+def _ensure_email_free(db: Session, email: str, exclude_id: int | None = None):
+    # Email администратора зарезервирован так же, как логин
+    if email == settings.admin_email.strip().lower():
+        raise ApiError(409, "Этот email зарезервирован под администратора из .env")
+    query = select(User).where(User.email == email)  # email уже в нижнем регистре
+    if exclude_id:
+        query = query.where(User.id != exclude_id)
+    if db.scalars(query).first():
+        raise ApiError(409, "Пользователь с таким email уже существует")
+
+
 @router.get("", response_model=list[UserOut], summary="Получение списка пользователей", responses=FORBIDDEN)
 def list_users(db: DB, admin: AdminUser):
     return db.scalars(select(User).order_by(User.username)).all()
@@ -51,7 +62,8 @@ def list_users(db: DB, admin: AdminUser):
 def create_user(data: UserCreate, db: DB, admin: AdminUser):
     """Создать администратора через API нельзя: он один и прописан в .env."""
     _ensure_username_free(db, data.username)
-    user = User(username=data.username, password_hash=hash_password(data.password))
+    _ensure_email_free(db, data.email)
+    user = User(username=data.username, email=data.email, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
     return user
@@ -64,13 +76,16 @@ def create_user(data: UserCreate, db: DB, admin: AdminUser):
     responses={**FORBIDDEN, **NOT_FOUND, **CONFLICT},
 )
 def update_user(user_id: int, data: UserUpdate, db: DB, admin: AdminUser):
-    """Можно сменить логин и/или пароль. Роль не меняется."""
+    """Можно сменить логин, пароль и email. Роль не меняется."""
     user = _get_manageable_user(db, user_id)
     if data.username and data.username != user.username:
         _ensure_username_free(db, data.username, exclude_id=user.id)
         user.username = data.username
     if data.password:
         user.password_hash = hash_password(data.password)
+    if data.email and data.email != user.email:
+        _ensure_email_free(db, data.email, exclude_id=user.id)
+        user.email = data.email
     db.commit()
     return user
 

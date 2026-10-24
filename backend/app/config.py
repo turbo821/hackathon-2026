@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     # --- Администратор (только из .env, через API не управляется) ---
     admin_username: str = "admin"
     admin_password: str = "admin"
+    admin_email: str = "admin@example.com"
 
     # --- Даты ---
     # Единый часовой пояс приложения: «сегодня», просрочка и напоминания считаются в нём
