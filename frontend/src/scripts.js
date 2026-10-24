@@ -1,30 +1,22 @@
-import './index.css'
-import { renderHome } from './pages/home.js'
-// --- НАСТРОЙКИ ---
-// Ссылка на API. Когда бэкенд будет готов, напарник даст тебе ссылку (или localhost:5000)
 const API_URL = 'http://localhost:5000/api/v1'; 
-let myRole = 'user'; // 'admin' или 'user'
+let myRole = 'admin'; 
 
-// --- 1. ЛОГИН ---
 async function handleLogin() {
-    const login = document.getElementById('login').value;
+    const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
 
-    // ЗАГЛУШКА (для тестов без бэкенда):
-    if (login === 'admin' && password === 'admin') {
+    if (email === 'admin' && password === 'admin') {
         myRole = 'admin';
         localStorage.setItem('token', 'fake-token-admin');
         showDashboard();
-    } else if (login === 'user' && password === 'user') {
+    } else if (email === 'user' && password === 'user') {
         myRole = 'user';
         localStorage.setItem('token', 'fake-token-user');
         showDashboard();
-    } else {
+    } else if (email === '' | password === ''){
         document.getElementById('login-error').classList.remove('hidden');
     }
-
     /* 
-    // РЕАЛЬНЫЙ КОД:
     try {
         const response = await fetch(`${API_URL}/auth/login`, {
             method: 'POST',
@@ -49,7 +41,7 @@ async function handleLogin() {
 function logout(e) {
     if (e) e.preventDefault();
     localStorage.removeItem('token');
-    location.reload(); // Перезагружаем страницу, чтобы вернуться на экран логина
+    location.reload();
 }
 
 
@@ -68,17 +60,16 @@ function showDashboard() {
     loadPayments(); // Загружаем данные
 }
 
-// --- 3. ЗАГРУЗКА ПЛАТЕЖЕЙ (ТАБЛИЦА) ---
 async function loadPayments() {
     // ЗАГЛУШКА (фейковые данные для тестов)
     let payments = [
-        { id: 1, name: 'Аренда офиса', amount: 50000, currency: 'RUB', date: '2023-11-01', status: 'unpaid' },
-        { id: 2, name: 'Сервер', amount: 20, currency: 'USD', date: '2023-10-25', status: 'paid', actual_date: '2023-10-24' },
-        { id: 3, name: 'Подписка', amount: 15, currency: 'EUR', date: '2023-10-20', status: 'overdue' }
-    ];
+    { id: 1, name: 'Аренда офиса', amount: 50000, currency: 'RUB', date: '2023-11-01', status: 'unpaid', paid_by: null },
+    { id: 2, name: 'Аренда офиса', amount: 50000, currency: 'RUB', date: '2023-11-01', status: 'unpaid', paid_by: null },
+    { id: 3, name: 'Сервер', amount: 20, currency: 'USD', date: '2023-10-25', status: 'paid', actual_date: '2023-10-24', paid_by: 'Вася' },
+    { id: 4, name: 'Подписка', amount: 15, currency: 'EUR', date: '2023-10-20', status: 'overdue', paid_by: null }
+];
 
     /* 
-    // РЕАЛЬНЫЙ КОД (когда бэкенд будет готов, раскомментируй это):
     try {
         const response = await fetch(`${API_URL}/recurring-payments`, {
             headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
@@ -123,9 +114,9 @@ async function loadPayments() {
             actionBtn = `<button class="btn btn-secondary" style="padding: 8px 15px; font-size: 13px;" onclick="markUnpaid(${p.id})">Отменить</button>`;
         }
 
-        // Формируем строку таблицы
         const row = `
             <tr>
+                <td>${p.paid_by ? p.paid_by : '—'}</td> 
                 <td>${p.name}</td>
                 <td>${amount} ${p.currency}</td>
                 <td>${p.date}</td>
@@ -143,8 +134,6 @@ async function loadPayments() {
 }
 
 function markPaid(id) {
-    // В идеале здесь мы спрашиваем у пользователя дату оплаты.
-    // Для простоты на хакатоне можно отправлять сегодняшнюю дату.
     const today = new Date().toISOString().split('T')[0]; 
     
     alert(`[Фронт] Отправляем PATCH запрос: отметить платеж ${id} как оплаченный (дата: ${today})`);
@@ -240,4 +229,3 @@ window.onload = () => {
         showDashboard();
     }
 }
-renderHome(document.querySelector('#app'))
