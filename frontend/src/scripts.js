@@ -24,6 +24,8 @@ let paymentsRequestId = 0;
 let usersCache = [];
 let editingUserId = null;
 let pendingConfirmation = null;
+let paymentsCache = [];
+let currentReceiptOccurrence = null;
 
 // ---------- Утилиты ----------
 
@@ -229,10 +231,12 @@ function occurrenceStatus(o) {
     }
 }
 
-function renderTable(items) {
+
+
+    function renderTable(items) {
     const tbody = $('payments-table-body');
     if (!items.length) {
-        setTableMessage('payments-table-body', 6, 'Нет платежей по этому фильтру');
+        setTableMessage('payments-table-body', 7, 'Нет платежей по этому фильтру');
         return;
     }
 
@@ -248,6 +252,10 @@ function renderTable(items) {
                </div>`
             : `<button class="btn btn-sm" onclick="markPaid(${o.id})">Оплатить</button>`;
 
+        const receiptCell = o.status === 'paid'
+            ? `<button class="btn btn-secondary btn-sm" onclick="showReceiptModalById(${o.id})">Посмотреть</button>`
+            : '—';
+
         return `
             <tr>
                 <td>${escapeHtml(o.marked_by || '—')}</td>
@@ -256,6 +264,7 @@ function renderTable(items) {
                 <td>${formatDate(o.due_date)}</td>
                 <td><span class="status ${cls}">${escapeHtml(text)}</span></td>
                 <td>${action}</td>
+                <td>${receiptCell}</td>
             </tr>`;
     }).join('');
 }
@@ -274,7 +283,7 @@ function renderSummary(summary) {
 
 async function loadPayments() {
     const requestId = ++paymentsRequestId;
-    setTableMessage('payments-table-body', 6, 'Загрузка…');
+    setTableMessage('payments-table-body', 7, 'Загрузка…');
     try {
         const [items, summary] = await Promise.all([
             api('/payment-occurrences', { params: FILTERS[currentFilter] }),
@@ -282,6 +291,7 @@ async function loadPayments() {
         ]);
         if (requestId !== paymentsRequestId) return; // пришёл ответ на устаревший фильтр
         renderTable(items);
+        paymentsCache = items;
         renderSummary(summary);
     } catch (e) {
         if (requestId === paymentsRequestId) setTableMessage('payments-table-body', 6, e.message);
@@ -305,8 +315,20 @@ async function updateOccurrence(id, body, successMessage) {
     loadPayments();
 }
 
-function markPaid(id) {
-    updateOccurrence(id, { status: 'paid' }, 'Оплата отмечена');
+async function markPaid(id) {
+    try {
+        const updated = await api(`/payment-occurrences/${id}`, {
+            method: 'PATCH',
+            body: { status: 'paid' }
+        });
+        showToast('Оплата отмечена');
+        // Обновляем таблицу в фоне
+        loadPayments();
+        // Показываем модальное окно с чеком
+        showReceiptModal(updated);
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
 }
 
 function markUnpaid(id) {
@@ -320,7 +342,121 @@ function changePaidDate(id, value) {
     }
     updateOccurrence(id, { paid_at: value }, 'Дата оплаты исправлена');
 }
+// ---------- Чек ----------
 
+function receiptHtml(o) {
+    const labelStyle = 'padding: 10px 12px; border-bottom: 1px solid #e5e5e5; border-right: 1px solid #e5e5e5; background-color: #f7f7f7 !important; color: #333 !important; font-weight: 600; width: 45%;';
+    const valueStyle = 'padding: 10px 12px; border-bottom: 1px solid #e5e5e5; background-color: #ffffff !important; color: #111 !important;';
+
+    return `
+        <div style="font-family: Arial, sans-serif; width: 100%; max-width: 600px; padding: 24px; color: #111 !important; background-color: #ffffff !important; border: 1px solid #ddd; box-sizing: border-box; margin: 0 auto;">
+            <h2 style="margin: 0 0 20px; text-align: center; color: #111 !important;">Чек об оплате</h2>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #e5e5e5; background-color: #ffffff !important; table-layout: fixed;">
+                <tr>
+                    <td style="${labelStyle}">Платёж</td>
+                    <td style="${valueStyle}">${escapeHtml(o.name)}</td>
+                </tr>
+                <tr>
+                    <td style="${labelStyle}">Сумма</td>
+                    <td style="${valueStyle}">${formatMoney(o.amount, o.currency)}</td>
+                </tr>
+                <tr>
+                    <td style="${labelStyle}">Срок оплаты</td>
+                    <td style="${valueStyle}">${formatDate(o.due_date)}</td>
+                </tr>
+                <tr>
+                    <td style="${labelStyle}">Фактическая дата оплаты</td>
+                    <td style="${valueStyle}">${o.paid_at ? formatDate(o.paid_at) : '—'}</td>
+                </tr>
+                <tr>
+                    <td style="${labelStyle}">Статус</td>
+                    <td style="${valueStyle}">${o.state === 'paid_late' ? 'Оплачено с опозданием' : 'Оплачено'}</td>
+                </tr>
+                <tr>
+                    <td style="${labelStyle} border-bottom: none;">ID периода</td>
+                    <td style="${valueStyle} border-bottom: none;">${o.id}</td>
+                </tr>
+            </table>
+            <p style="margin-top: 24px; font-size: 12px; color: #888 !important; text-align: center;">
+                Сформировано: ${new Date().toLocaleString('ru-RU')}
+            </p>
+        </div>
+    `;
+}
+async function generateReceiptPdf(o) {
+    const holder = document.createElement('div');
+    holder.style.position = 'fixed';
+    holder.style.left = '-10000px';
+    holder.style.top = '0';
+    holder.innerHTML = receiptHtml(o);
+    document.body.appendChild(holder);
+
+    const canvas = await window.html2canvas(holder, { scale: 2, backgroundColor: '#ffffff' });
+    holder.remove();
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4' });
+    const imgData = canvas.toDataURL('image/png');
+    const pageWidth = 210;
+    const margin = 10;
+    const imgWidth = pageWidth - margin * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
+    return pdf;
+}
+
+function showReceiptModal(occ) {
+    currentReceiptOccurrence = occ;
+    $('receipt-preview').innerHTML = receiptHtml(occ);
+    $('receipt-modal').classList.remove('hidden');
+}
+
+function closeReceiptModal() {
+    $('receipt-modal').classList.add('hidden');
+    currentReceiptOccurrence = null;
+}
+
+function showReceiptModalById(id) {
+    const occ = paymentsCache.find(o => o.id === id);
+    if (occ) {
+        showReceiptModal(occ);
+    } else {
+        showToast('Платёж не найден', 'error');
+    }
+}
+
+async function downloadReceiptPdfFromModal() {
+    if (!currentReceiptOccurrence) return;
+    try {
+        const pdf = await generateReceiptPdf(currentReceiptOccurrence);
+        pdf.save(`receipt_${currentReceiptOccurrence.id}.pdf`);
+    } catch (e) {
+        showToast('Не удалось сгенерировать PDF', 'error');
+    }
+}
+
+async function sendReceiptEmailFromModal() {
+    if (!currentReceiptOccurrence) return;
+    if (!currentUser?.email) {
+        showToast('У текущего пользователя не указан email', 'error');
+        return;
+    }
+    try {
+        const pdf = await generateReceiptPdf(currentReceiptOccurrence);
+        const pdfBase64 = pdf.output('datauristring').split(',')[1];
+        await api(`/payment-occurrences/${currentReceiptOccurrence.id}/send-receipt`, {
+            method: 'POST',
+            body: {
+                email: currentUser.email,
+                filename: `receipt_${currentReceiptOccurrence.id}.pdf`,
+                pdf_base64: pdfBase64,
+            },
+        });
+        showToast(`Чек отправлен на ${currentUser.email}`);
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
 // ---------- Красивое подтверждение опасных действий ----------
 
 function showConfirm({ title, message, confirmText = 'Подтвердить' }) {
@@ -608,7 +744,10 @@ Object.assign(window, {
     handleLogin, logout, switchTab,
     filterPayments, markPaid, markUnpaid, changePaidDate,
     loadRecurring, openModal, closeModal, createPayment, stopPayment,
-    openModal1, closeModal1, createUser, editUser, deleteUser,
+    openModal1, closeModal1, createUser, editUser, deleteUser, showReceiptModalById,
+closeReceiptModal,
+downloadReceiptPdfFromModal,
+sendReceiptEmailFromModal,
 });
 
 initConfirmModal();

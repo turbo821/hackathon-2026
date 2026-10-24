@@ -5,7 +5,21 @@
     padding: 0;
     box-sizing: border-box;
 }
+.receipt-modal-content {
+    max-width: 680px; /* Чуть больше самого чека, чтобы был красивый отступ */
+    width: 95%;
+}
 
+.receipt-preview {
+    margin: 20px 0;
+    width: 100%;
+    overflow-x: auto;
+    /* Добавим светлый фон для области предпросмотра */
+    background: #f0f0f0; 
+    padding: 10px;
+    border-radius: 8px;
+    box-sizing: border-box;
+}
 body {
     font-family: 'Poppins', sans-serif;
     font-weight: 400;

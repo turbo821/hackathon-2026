@@ -9,6 +9,16 @@
     <link rel="shortcut icon" href="images/icons8-монеты-96.png" type="image/x-icon">
 
 </head>
+<style>
+    .receipt-modal-content {
+        max-width: 700px;
+        width: 90%;
+    }
+    .receipt-preview {
+        margin: 20px 0;
+        overflow-x: auto;
+    }
+</style>
 <body>
     <div class="wrapper">
         <header class="container header">
@@ -90,6 +100,7 @@
                                 <th>Срок</th>
                                 <th>Статус</th>
                                 <th>Действие</th>
+                                <th>Чек</th>
                             </tr>
                         </thead>
                         <tbody id="payments-table-body"></tbody>
@@ -212,6 +223,17 @@
             </div>
         </div>
     </div>
+    <div id="receipt-modal" class="modal-overlay hidden">
+    <div class="modal-content receipt-modal-content">
+        <h3>Чек об оплате</h3>
+        <div id="receipt-preview" class="receipt-preview"></div>
+        <div class="modal-actions">
+            <button class="btn" onclick="downloadReceiptPdfFromModal()">Скачать PDF</button>
+            <button class="btn btn-secondary" onclick="sendReceiptEmailFromModal()">Отправить на почту</button>
+            <button class="btn btn-secondary" onclick="closeReceiptModal()">Закрыть</button>
+        </div>
+    </div>
+</div>
 
     <!-- Кастомное окно подтверждения удаления/прекращения -->
     <div id="confirm-modal" class="modal-overlay confirm-overlay hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
@@ -224,6 +246,9 @@
             </div>
         </div>
     </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script type="module" src="src/scripts.js"></script>
 
     <script type="module" src="src/scripts.js"></script>
 </body>
