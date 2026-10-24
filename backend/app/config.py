@@ -1,3 +1,4 @@
+from pydantic import BaseModel, EmailStr, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,8 +18,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 720
 
-    # --- Суперадмин (только из .env, через API не управляется) ---
-    # Создаёт администраторов; сами администраторы живут в БД.
+    # --- Суперадмин (только из .env, через API не управляется)
     superadmin_username: str = "superadmin"
     superadmin_password: str = "superadmin"
     superadmin_email: str = "superadmin@example.com"
@@ -28,10 +28,23 @@ class Settings(BaseSettings):
     app_timezone: str = "Europe/Moscow"
 
     # --- Напоминания ---
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
     reminder_days_before: int = 3
     reminder_check_interval_seconds: int = 60
+    # --- Telegram ---
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    # Чат, в который пользователи вступают по ссылке с сайта. Бот должен быть
+    # в нём администратором с правом can_invite_users.
+    telegram_group_chat_id: str = ""
+    # --- SMTP ---
+    smtp_host: str = "smtp.mail.ru"
+    smtp_port: int = 465
+    # Адрес ящика (он же логин на сервере) и пароль задаются только в .env:
+    # в коде секреты и чужие адреса не держим.
+    smtp_addr: EmailStr | None = None
+    smtp_password: SecretStr = SecretStr("")
+    smtp_name: str = "Invoice Keeper"
+    smtp_subject: str = "Напоминание об оплате"
 
     # --- Тестовые данные ---
     # Скрипт scripts.seed_demo создаёт демо-платежи (аренда/сервер/подписка).
@@ -39,6 +52,8 @@ class Settings(BaseSettings):
 
     # --- CORS ---
     cors_origins: str = "*"
+
+    telegram_bot_username: str = ""
 
 
 settings = Settings()

@@ -110,3 +110,16 @@ class SummaryOut(Schema):
     date_to: date | None
     on_date: date
     currencies: list[CurrencyTotals]
+
+class PaymentLogOut(Schema):
+    """Запись журнала оплат: кто, что, когда и откуда."""
+
+    occurrence_id: int
+    recurring_payment_id: int
+    name: str
+    amount: MoneyOut
+    currency: Currency
+    due_date: date
+    paid_at: date
+    paid_source: str | None = Field(description="site или telegram")
+    paid_by: str | None = Field(description="Кто оплатил (имя из системы)")

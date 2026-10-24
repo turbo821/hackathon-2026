@@ -12,7 +12,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -36,7 +36,8 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=utcnow, onupdate=utcnow
     )
-
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, index=True)
+    
     @property
     def is_superadmin(self) -> bool:
         return self.role == ROLE_SUPERADMIN

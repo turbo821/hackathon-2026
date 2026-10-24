@@ -8,6 +8,7 @@ alembic>=1.13
 
 # Схемы и настройки
 pydantic>=2.7
+pydantic[email]
 pydantic-settings>=2.3
 python-dotenv>=1.0
 

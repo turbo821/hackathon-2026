@@ -222,3 +222,6 @@ __marimo__/
 logs/
 *.log
 instance/
+
+# Личный черновик проверки SMTP (дублирует backend/scripts/check_smtp.py)
+backend/test.py

@@ -14,8 +14,6 @@ AssignableRole = Literal["admin", "user"]
 
 def _check_username(value: str) -> str:
     value = value.strip()
-    if not USERNAME_RE.match(value):
-        raise ValueError("Логин: 3–64 символа, латиница, цифры, точка, дефис, подчёркивание")
     return value
 
 
@@ -38,7 +36,9 @@ class UserOut(Schema):
     email: str
     role: Literal["superadmin", "admin", "user"] = Field(
         description="superadmin — из .env, через панель не меняется; "
-        "admin — назначает суперадмин; user — обычный пользователь"
+        "admin — назначает суперадмин; user — обычный пользователь")
+    telegram_id: int | None = Field(
+        None, description="Telegram ID: привязан ли аккаунт к боту"
     )
     created_at: UtcDateTime
 
@@ -87,6 +87,14 @@ class UserUpdate(Schema):
         return None if v is None else _check_email(v)
 
 
+class UserMeUpdate(Schema):
+    """Пользователь меняет только свой Telegram ID."""
+
+    telegram_id: int | None = Field(
+        None, description="Ваш Telegram ID: напишите боту — он ответит"
+    )
+
+
 class LoginIn(Schema):
     email: str = Field(examples=["superadmin@example.com"])
     password: str = Field(examples=["superadmin"])
@@ -103,3 +111,19 @@ class TokenOut(Schema):
     token_type: str = Field(examples=["Bearer"])
     expires_at: UtcDateTime
     user: UserOut
+
+
+class TelegramLinkOut(Schema):
+    """Ссылка для привязки Telegram-аккаунта."""
+
+    token: str
+    url: str = Field(description="Открыть в Telegram — бот привяжет аккаунт")
+    expires_at: UtcDateTime
+
+
+class TelegramChatLinkOut(Schema):
+    """Ссылка-приглашение в чат: по ней бот узнаёт Telegram ID вошедшего."""
+
+    token: str
+    url: str = Field(description="Ссылка-приглашение в чат Telegram")
+    expires_at: UtcDateTime

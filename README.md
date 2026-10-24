@@ -124,6 +124,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
+> **После `git pull` всегда пишите `--build`.** Без него Docker возьмёт уже
+> собранный образ — а образ может быть собран со старой версией кода, и
+> контейнер упадёт (например, на `flask --app main run` из докерфайла
+> прошлой версии, когда бэкенд был ещё на Flask). Если registry недоступен
+> (`TLS handshake timeout`), поднимитесь из локальных образов:
+> `docker compose up -d --no-build`.
+
 Поднимаются два сервиса:
 
 - `backend` — API на http://localhost:5000
