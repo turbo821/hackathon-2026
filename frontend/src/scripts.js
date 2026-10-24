@@ -2,7 +2,7 @@
 // Скрипт подключён как module (type="module"), поэтому функции, которые
 // вызываются из onclick в HTML, в конце файла выставляются в window.
 
-const API_URL = (import.meta.env?.VITE_API_URL || 'http://localhost:5000/api/v1').replace(/\/+$/, '');
+const API_URL = (import.meta.env?.VITE_API_URL || 'http://backend:5000/api/v1').replace(/\/+$/, '');
 
 // На бэкенде роль владельца называется superadmin, в интерфейсе — owner
 const ROLE_LABELS = { superadmin: 'owner', admin: 'admin', user: 'user' };
