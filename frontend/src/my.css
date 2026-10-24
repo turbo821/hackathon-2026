@@ -1,0 +1,367 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box; 
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    font-weight: 400;
+    color: #fff;
+    font-size: 16px;
+    background: #000;
+    min-height: 100vh;
+}
+
+a {
+    text-decoration: none; 
+}
+
+img {
+    max-width: 100%;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.wrapper{
+    background: linear-gradient(180deg, rgba(0, 0, 0, 1) 0%, rgba(26, 14, 1, 1) 100%);
+    width: 100%;
+    min-height: 100vh;
+    padding-bottom: 50px;
+}
+
+.container{
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+
+.header {
+    padding: 50px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    text-transform: uppercase;
+    font-size: 29px;
+    font-weight: 800;
+    color: #fff;
+}
+
+.header nav ul{
+    list-style: none;
+    display: flex;
+    gap: 30px;
+}
+
+.header nav ul li a{
+    color: #fff;
+    font-weight: 500;
+    transition: color 300ms ease;
+}
+
+.header nav ul li a:hover {
+    color: #FA9021;
+}
+/* Стиль для кнопки Telegram */
+.telegram {
+    background: #0088CC;
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    border-radius: 50px;
+    padding: 15px 30px;
+    border: 0;
+    transition: all 500ms ease;
+    font-size: 18px;
+    font-family: 'Poppins', sans-serif;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.telegram:hover {
+    background: #0077b3;
+    transform: scale(1.05);
+}
+.btn {
+    background: #FA8305;
+    color: #fff;
+    border-radius: 50px;
+    padding: 15px 30px;
+    border: 0;
+    transition: all 500ms ease;
+    font-size: 18px;
+    font-family: 'Poppins', sans-serif;
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.btn:hover {
+    background: #DC7000;
+    transform: scale(1.05);
+}
+
+.btn:disabled {
+    background: #555;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-full {
+    width: 100%;
+}
+
+.btn-secondary {
+    background: #555;
+}
+
+.btn-secondary:hover {
+    background: #444;
+}
+
+.input-field {
+    width: 100%;
+    background: #1C140F;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 5px;
+    padding: 15px 20px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 16px;
+    outline: none;
+    transition: border 300ms ease;
+}
+
+.input-field:focus {
+    border-color: #FA8305;
+}
+
+.input-field::placeholder {
+    color: #898989;
+}
+
+/* Убираем стрелочки у поля ввода суммы */
+input[type=number]::-webkit-inner-spin-button, 
+input[type=number]::-webkit-outer-spin-button { 
+    -webkit-appearance: none; 
+    margin: 0; 
+}
+input[type=number] {
+    -moz-appearance: textfield;
+}
+
+/* =========================================
+   ЭКРАН ЛОГИНА
+   ========================================= */
+#login-screen {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 60vh;
+}
+
+.login-box {
+    width: 100%;
+    max-width: 400px;
+    margin: 100px auto;
+}
+
+.login-box h2 {
+    color: #E87D0E;
+    font-size: 20px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.login-box h1 {
+    font-size: 30px;
+    font-weight: 600;
+    margin-bottom: 30px;
+    text-align: center;
+}
+
+.login-form {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.error-text {
+    color: #ff4d4d;
+    margin-top: 10px;
+    text-align: center;
+}
+
+/* =========================================
+   ДАШБОРД
+   ========================================= */
+.dashboard-container {
+    padding-top: 50px;
+    padding-bottom: 100px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+/* Блок с итогами */
+.summary-cards {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+}
+
+.summary-card {
+    flex: 1;
+    min-width: 250px;
+    background: #1c140f;
+    border-radius: 10px;
+    padding: 30px;
+    border-left: 5px solid #FA8305;
+}
+
+.summary-amount {
+    margin-top: 15px;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+/* Таблица */
+.table-container {
+    background: #1c140f;
+    padding: 20px;
+    border-radius: 10px;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    text-align: left;
+    border-collapse: collapse;
+    min-width: 800px;
+}
+
+table th {
+    padding: 15px 10px;
+    border-bottom: 2px solid #333;
+    color: #FA8305;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+table td {
+    padding: 20px 10px;
+    border-bottom: 1px solid #2a221d;
+    font-size: 15px;
+}
+
+table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Статусы */
+.status {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.status-paid { 
+    background: rgba(74, 222, 128, 0.1); 
+    color: #4ade80; 
+}
+
+.status-unpaid { 
+    background: rgba(250, 204, 21, 0.1); 
+    color: #facc15; 
+}
+
+.status-overdue { 
+    background: rgba(248, 113, 113, 0.1); 
+    color: #f87171; 
+}
+
+.modal-overlay {
+    display: flex; 
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background: #1c140f;
+    padding: 40px;
+    border-radius: 10px;
+    width: 100%;
+    max-width: 450px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.modal-content h3 {
+    margin-bottom: 20px;
+    font-size: 24px;
+    color: #FA8305;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 25px;
+}
+
+.modal-actions .btn {
+    flex: 1;
+    padding: 12px;
+    font-size: 16px;
+}
+
+@media (max-width: 768px) {
+    .header {
+        flex-direction: column;
+        gap: 20px;
+        padding: 30px 0;
+    }
+    
+    .summary-cards {
+        flex-direction: column;
+    }
+    
+    .dashboard-header {
+        flex-direction: column;
+        gap: 15px;
+        align-items: flex-start;
+    }
+    
+    .modal-content {
+        padding: 20px;
+        margin: 20px;
+    }
+}
