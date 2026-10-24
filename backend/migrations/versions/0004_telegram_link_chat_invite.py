@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "0003_telegram_link_chat_invite"
-down_revision = "0002_user_email"
+revision = "0004_telegram_link_chat_invite"
+down_revision = "0003_user_role"
 branch_labels = None
 depends_on = None
 
