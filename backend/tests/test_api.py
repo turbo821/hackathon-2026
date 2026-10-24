@@ -48,22 +48,12 @@ def test_no_access_without_auth(client):
 
 
 def test_login_me_logout(client):
-<<<<<<< HEAD
     bad = client.post(f"{API}/auth/login", json={"email": "root@example.com", "password": "bad"})
     assert bad.status_code == 401
     # по логину больше не входят
     assert client.post(f"{API}/auth/login", json={"username": "root", "password": "root-pass"}).status_code == 422
     # email без учёта регистра и пробелов
     headers = login(client, " Root@Example.com ", "root-pass")
-=======
-    assert (
-        client.post(
-            f"{API}/auth/login", json={"email": "admin@example.com", "password": "bad"}
-        ).status_code
-        == 401
-    )
-    headers = login(client, "admin@example.com", "admin-pass")
->>>>>>> glebgubiev10
     me = client.get(f"{API}/auth/me", headers=headers).json()
     assert me["role"] == "superadmin"
     assert me["email"] == "root@example.com"
@@ -122,7 +112,6 @@ def test_user_cannot_do_admin_actions_via_api(client, admin, user):
     assert client.get(f"{API}/recurring-payments", headers=user).status_code == 200
 
 
-<<<<<<< HEAD
 def test_superadmin_has_admin_and_user_rights(client, superadmin):
     rp = create_payment(client, superadmin)
     assert client.get(f"{API}/recurring-payments", headers=superadmin).status_code == 200
@@ -169,18 +158,6 @@ def test_only_superadmin_manages_admins(client, superadmin, admin):
     r = client.post(f"{API}/users", json={**body, "username": "boss3", "email": "boss3@example.com",
                                          "role": "superadmin"}, headers=superadmin)
     assert r.status_code == 422
-=======
-def test_env_admin_cannot_be_managed(client, admin):
-    users = client.get(f"{API}/users", headers=admin).json()
-    admin_id = next(u["id"] for u in users if u["role"] == "admin")
-    assert (
-        client.patch(
-            f"{API}/users/{admin_id}", json={"password": "newpass1"}, headers=admin
-        ).status_code
-        == 403
-    )
-    assert client.delete(f"{API}/users/{admin_id}", headers=admin).status_code == 403
->>>>>>> glebgubiev10
 
 
 def test_user_crud(client, admin):
@@ -191,7 +168,6 @@ def test_user_crud(client, admin):
     )
     assert r.status_code == 201 and r.json()["role"] == "user"
     uid = r.json()["id"]
-<<<<<<< HEAD
     assert client.post(f"{API}/users", json={"username": "petr", "password": "x123456",
                                             "email": "other@example.com"}, headers=admin).status_code == 409
     assert client.patch(f"{API}/users/{uid}", json={"password": "newpass1"}, headers=admin).status_code == 200
@@ -199,35 +175,6 @@ def test_user_crud(client, admin):
     assert client.delete(f"{API}/users/{uid}", headers=admin).status_code == 204
     r = client.post(f"{API}/auth/login", json={"email": "petr@example.com", "password": "newpass1"})
     assert r.status_code == 401
-=======
-    assert (
-        client.post(
-            f"{API}/users",
-            json={
-                "username": "petr",
-                "password": "x123456",
-                "email": "other@example.com",
-            },
-            headers=admin,
-        ).status_code
-        == 409
-    )
-    assert (
-        client.patch(
-            f"{API}/users/{uid}", json={"password": "newpass1"}, headers=admin
-        ).status_code
-        == 200
-    )
-    login(client, "petr@example.com", "newpass1")
-    assert client.delete(f"{API}/users/{uid}", headers=admin).status_code == 204
-    assert (
-        client.post(
-            f"{API}/auth/login",
-            json={"email": "petr@example.com", "password": "newpass1"},
-        ).status_code
-        == 401
-    )
->>>>>>> glebgubiev10
 
 
 def test_user_email_required_and_unique(client, admin):
@@ -245,7 +192,6 @@ def test_user_email_required_and_unique(client, admin):
         f"{API}/users", json={**base, "email": " Olga@Example.com "}, headers=admin
     )
     assert r.status_code == 201 and r.json()["email"] == "olga@example.com"
-<<<<<<< HEAD
     # занят без учёта регистра; логин и email суперадмина зарезервированы
     assert client.post(f"{API}/users", json={"username": "olga2", "password": "olga12345",
                                             "email": "OLGA@example.com"}, headers=admin).status_code == 409
@@ -253,33 +199,6 @@ def test_user_email_required_and_unique(client, admin):
                                             "email": "root@example.com"}, headers=admin).status_code == 409
     assert client.post(f"{API}/users", json={"username": "root", "password": "olga12345",
                                             "email": "r@example.com"}, headers=admin).status_code == 409
-=======
-    # занят без учёта регистра; email администратора зарезервирован
-    assert (
-        client.post(
-            f"{API}/users",
-            json={
-                "username": "olga2",
-                "password": "olga12345",
-                "email": "OLGA@example.com",
-            },
-            headers=admin,
-        ).status_code
-        == 409
-    )
-    assert (
-        client.post(
-            f"{API}/users",
-            json={
-                "username": "olga3",
-                "password": "olga12345",
-                "email": "admin@example.com",
-            },
-            headers=admin,
-        ).status_code
-        == 409
-    )
->>>>>>> glebgubiev10
     uid = r.json()["id"]
     r = client.patch(f"{API}/users/{uid}", json={"email": "o@ex.com"}, headers=admin)
     assert r.status_code == 200 and r.json()["email"] == "o@ex.com"
@@ -287,16 +206,8 @@ def test_user_email_required_and_unique(client, admin):
 
 
 def test_deleted_user_token_stops_working(client, admin):
-<<<<<<< HEAD
     r = client.post(f"{API}/users", json={"username": "temp", "password": "temp12345",
                                          "email": "temp@example.com"}, headers=admin)
-=======
-    r = client.post(
-        f"{API}/users",
-        json={"username": "temp", "password": "temp12345", "email": "temp@example.com"},
-        headers=admin,
-    )
->>>>>>> glebgubiev10
     headers = login(client, "temp@example.com", "temp12345")
     client.delete(f"{API}/users/{r.json()['id']}", headers=admin)
     assert client.get(f"{API}/auth/me", headers=headers).status_code == 401
