@@ -1,5 +1,13 @@
 services:
-  # API
+  xray:
+    image: ghcr.io/xtls/xray-core:latest
+    container_name: xray-proxy
+    restart: unless-stopped
+    ports:
+      - "1080:1080"
+    volumes:
+      - ./xray/config.json:/etc/xray/config.json:ro
+
   backend:
     build: ./backend
     env_file: .env
@@ -9,28 +17,12 @@ services:
       - ./backend:/app
       - backend_data:/app/instance
     restart: unless-stopped
-
-  # Панель
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        # Реестр npm для сборки. Меняется в .env: NPM_REGISTRY=...
-        # Нужен там, где официальный реестр недоступен (IPv4 до Cloudflare закрыт).
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
-    env_file: .env
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
-      - backend
-    restart: unless-stopped
+      - xray
+    environment:
+      # Явно указываем бекэнду использовать SOCKS5 прокси внутри Docker-сети
+      - BOT_PROXY_URL=socks5://xray:1080
 
-  # Фоновые напоминания в Telegram.
-  # entrypoint переопределён: миграции и сиды выполняет сервис backend,
-  # иначе два процесса будут одновременно менять одну SQLite-базу.
   worker:
     build: ./backend
     env_file: .env
@@ -43,13 +35,10 @@ services:
     depends_on:
       - backend
       - xray
+      - xray
     restart: unless-stopped
-    networks:
-      - app-network
+    environment:
+      - BOT_PROXY_URL=socks5://xray:1080
 
 volumes:
   backend_data:
-
-networks:
-  app-network:
-    driver: bridge
