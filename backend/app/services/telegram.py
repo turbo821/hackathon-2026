@@ -11,12 +11,14 @@
 - добавили платёж позже, чем за 3 дня до срока → напоминание сразу.
 """
 
+import httpx
+
 from app.config import settings
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-API_URL = "https://api.telegram.org/bot{token}/sendMessage"
+API_URL = "https://api.telegram.org/bot8662224659:AAFuQiKUkXmoAK91S4Foz93KKs0fjkMTwzk/sendMessage"
 
 
 class TelegramNotConfigured(RuntimeError):
@@ -32,7 +34,9 @@ def send_message(text: str, chat_id: str | None = None) -> dict:
     """Отправляет HTML-сообщение в чат. Бросает исключение при ошибке."""
     # TODO(каркас → реализация): POST на Bot API, разобрать ответ, не писать токен в лог.
     if not is_configured():
-        raise TelegramNotConfigured("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID не заданы в .env")
+        raise TelegramNotConfigured(
+            "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID не заданы в .env"
+        )
     raise NotImplementedError(
         "Отправка в Telegram ещё не реализована — это этап «каркас». "
         "Реализация: POST api.telegram.org/bot<token>/sendMessage, parse_mode=HTML."

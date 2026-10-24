@@ -3,9 +3,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth import DB, AdminUser, hash_password
+from app.config import settings
 from app.errors import ApiError
 from app.models import User
-from app.models.user import ROLE_USER
 from app.schemas.users import UserCreate, UserOut, UserUpdate
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -19,12 +19,16 @@ def _get_manageable_user(db: Session, user_id: int) -> User:
     user = db.get(User, user_id)
     if user is None:
         raise ApiError(404, "Пользователь не найден")
-    if user.is_env_admin or user.is_admin:
+    if user.is_admin:
         raise ApiError(403, "Учётную запись администратора нельзя изменить через панель")
     return user
 
 
 def _ensure_username_free(db: Session, username: str, exclude_id: int | None = None):
+    # Логин администратора зарезервирован: иначе обычный пользователь занял бы
+    # его логин, а сид потом переписал бы ему пароль из .env
+    if username.strip().lower() == settings.admin_username.strip().lower():
+        raise ApiError(409, "Этот логин зарезервирован под администратора из .env")
     query = select(User).where(func.lower(User.username) == username.lower())
     if exclude_id:
         query = query.where(User.id != exclude_id)
@@ -34,7 +38,7 @@ def _ensure_username_free(db: Session, username: str, exclude_id: int | None = N
 
 @router.get("", response_model=list[UserOut], summary="Получение списка пользователей", responses=FORBIDDEN)
 def list_users(db: DB, admin: AdminUser):
-    return db.scalars(select(User).order_by(User.role, User.username)).all()
+    return db.scalars(select(User).order_by(User.username)).all()
 
 
 @router.post(
@@ -45,9 +49,9 @@ def list_users(db: DB, admin: AdminUser):
     responses={**FORBIDDEN, **CONFLICT},
 )
 def create_user(data: UserCreate, db: DB, admin: AdminUser):
-    """Роль всегда `user`: создать администратора через API нельзя."""
+    """Создать администратора через API нельзя: он один и прописан в .env."""
     _ensure_username_free(db, data.username)
-    user = User(username=data.username, password_hash=hash_password(data.password), role=ROLE_USER)
+    user = User(username=data.username, password_hash=hash_password(data.password))
     db.add(user)
     db.commit()
     return user

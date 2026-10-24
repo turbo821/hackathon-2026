@@ -19,7 +19,6 @@ from app.auth import hash_password
 from app.config import settings
 from app.logging_config import get_logger
 from app.models import RecurringPayment, User
-from app.models.user import ROLE_USER
 from app.timeutils import today
 
 logger = get_logger(__name__)
@@ -34,7 +33,7 @@ def run(db: Session):
 
     for username, password in DEMO_USERS:
         if not db.scalars(select(User).where(User.username == username)).first():
-            db.add(User(username=username, password_hash=hash_password(password), role=ROLE_USER))
+            db.add(User(username=username, password_hash=hash_password(password)))
             logger.info(f"demo: создан пользователь {username} / {password}")
     db.commit()
 
@@ -43,7 +42,7 @@ def run(db: Session):
         return
 
     on = today()
-    admin = db.scalars(select(User).where(User.is_env_admin.is_(True))).first()
+    admin = db.scalars(select(User).where(User.username == settings.admin_username.strip())).first()
 
     # Аренда — рубли, сервер — доллары, подписка — евро.
     # Даты считаются от «сегодня», поэтому демо актуально в любой день.

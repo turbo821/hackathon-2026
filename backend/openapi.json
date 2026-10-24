@@ -698,7 +698,7 @@
           "users"
         ],
         "summary": "Создание обычного пользователя",
-        "description": "Роль всегда `user`: создать администратора через API нельзя.",
+        "description": "Создать администратора через API нельзя: он один и прописан в .env.",
         "operationId": "create_user_api_v1_users_post",
         "requestBody": {
           "content": {
@@ -1448,12 +1448,8 @@
               "admin",
               "user"
             ],
-            "title": "Role"
-          },
-          "is_env_admin": {
-            "type": "boolean",
-            "title": "Is Env Admin",
-            "description": "Администратор из .env — через API не изменяется"
+            "title": "Role",
+            "description": "Админ - из .env, нельзя изменить через панель"
           },
           "created_at": {
             "type": "string",
@@ -1466,7 +1462,6 @@
           "id",
           "username",
           "role",
-          "is_env_admin",
           "created_at"
         ],
         "title": "UserOut"

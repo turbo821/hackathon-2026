@@ -46,7 +46,7 @@ def test_login_me_logout(client):
     assert client.post(f"{API}/auth/login", json={"username": "admin", "password": "bad"}).status_code == 401
     headers = login(client, "admin", "admin-pass")
     me = client.get(f"{API}/auth/me", headers=headers).json()
-    assert me["role"] == "admin" and me["is_env_admin"] is True
+    assert me["role"] == "admin"
     assert client.post(f"{API}/auth/logout", headers=headers).status_code == 200
     assert client.get(f"{API}/auth/me", headers=headers).status_code == 401
 
@@ -83,7 +83,7 @@ def test_user_cannot_do_admin_actions_via_api(client, admin, user):
 
 def test_env_admin_cannot_be_managed(client, admin):
     users = client.get(f"{API}/users", headers=admin).json()
-    admin_id = next(u["id"] for u in users if u["is_env_admin"])
+    admin_id = next(u["id"] for u in users if u["role"] == "admin")
     assert client.patch(f"{API}/users/{admin_id}", json={"password": "newpass1"}, headers=admin).status_code == 403
     assert client.delete(f"{API}/users/{admin_id}", headers=admin).status_code == 403
 

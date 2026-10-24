@@ -20,10 +20,14 @@
 
 from datetime import date
 
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.logging_config import get_logger
 from app.models import PaymentOccurrence, RecurringPayment
+from app.models.payment_occurrence import STATUS_UNPAID
+from app.timeutils import add_months, today
 
 logger = get_logger(__name__)
 
@@ -32,23 +36,79 @@ MAX_PERIODS = 1200
 
 
 def due_dates(rp: RecurringPayment):
-    """Генератор дат оплаты платежа."""
-    # TODO(каркас → реализация): отдавать даты по правилам выше.
-    return iter(())
+    """Генератор дат оплаты: первая дата и далее с шагом периода."""
+    for k in range(MAX_PERIODS):
+        yield add_months(rp.first_due_date, k * rp.months_step, rp.anchor_day)
 
 
-def ensure_occurrences(db: Session, rp: RecurringPayment, on: date | None = None) -> list[PaymentOccurrence]:
+def ensure_occurrences(
+    db: Session, rp: RecurringPayment, on: date | None = None
+) -> list[PaymentOccurrence]:
     """Досоздаёт недостающие периоды платежа.
 
-    Каждый период копирует поля шаблона (name, amount, currency) и получает
-    payment_ended_at = None. Возвращает список созданных периодов;
-    коммит делает вызывающий код.
+    Идём от первой даты и останавливаемся на первом неоплаченном периоде
+    со сроком сегодня или позже: прошлые периоды уже созданы и оплачены,
+    текущий — ждёт оплаты, а следующий появится, как только текущий закроют.
     """
-    # TODO(каркас → реализация): создать PaymentOccurrence для всех дат
-    # от first_due_date до первого неоплаченного периода со сроком сегодня или позже.
-    logger.debug(f"periods.ensure_occurrences: заглушка, платёж #{getattr(rp, 'id', None)}")
-    return []
+    if not rp.is_active:
+        return []
 
+    on = on or today()
+    if rp.id is None:
+        db.flush()
+
+    existing = {
+        o.due_date: o
+        for o in db.scalars(
+            select(PaymentOccurrence).where(
+                PaymentOccurrence.recurring_payment_id == rp.id
+            )
+        )
+    }
+
+    created = []
+
+    for due in due_dates(rp):
+        occ = existing.get(due)
+        if occ is None:
+            occ = _create_occurrence(db, rp, due)
+            if occ is not None:
+                created.append(occ)
+            else:
+                # Параллельно создал другой процесс — забираем его запись
+                occ = db.scalars(
+                    select(PaymentOccurrence).where(
+                        PaymentOccurrence.recurring_payment_id == rp.id,
+                        PaymentOccurrence.due_date == due,
+                    )
+                ).one()
+            existing[due] = occ
+        if due >= on and occ.status == STATUS_UNPAID:
+            break
+    if created:
+        logger.info(
+            f"Платёж #{rp.id} «{rp.name}»: создано периодов {len(created)} "
+            f"({created[0].due_date} … {created[-1].due_date})"
+        )
+    return created
+
+def _create_occurrence(db: Session, rp: RecurringPayment, due: date) -> PaymentOccurrence | None:
+    """Создаёт период в savepoint: дубль (unique-constraint) не ломает транзакцию."""
+    occ = PaymentOccurrence(
+        recurring_payment_id=rp.id,
+        name=rp.name,
+        amount=rp.amount,
+        currency=rp.currency,
+        due_date=due,
+        status=STATUS_UNPAID,
+    )
+    try:
+        with db.begin_nested():
+            db.add(occ)
+        return occ
+    except IntegrityError:
+        logger.warning(f"Период {due} для платежа #{rp.id} уже создан другим процессом")
+        return None
 
 def ensure_all_occurrences(db: Session, on: date | None = None) -> int:
     """Досоздаёт периоды для всех активных платежей. Возвращает число новых."""

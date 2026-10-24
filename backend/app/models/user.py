@@ -1,8 +1,16 @@
+"""Пользователь панели.
+
+Администратор — ровно один, и он прописан в .env (ADMIN_USERNAME).
+Поэтому в таблице нет колонок role/is_env_admin: роль вычисляется из логина,
+и база не может разойтись с настройкой.
+"""
+
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.config import settings
 from app.db import Base
 from app.timeutils import utcnow
 
@@ -17,15 +25,19 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
-    role: Mapped[str] = mapped_column(String(16), default=ROLE_USER)
-    # Администратор из .env: через API его нельзя изменить или удалить
-    is_env_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow
+    )
 
     @property
     def is_admin(self) -> bool:
-        return self.role == ROLE_ADMIN
+        """Администратор — тот аккаунт, который прописан в .env."""
+        return self.username.strip().lower() == settings.admin_username.strip().lower()
+
+    @property
+    def role(self) -> str:
+        return ROLE_ADMIN if self.is_admin else ROLE_USER
 
     def __repr__(self) -> str:
         return f"<User {self.id} {self.username} ({self.role})>"

@@ -24,8 +24,7 @@ def _check_password(value: str) -> str:
 class UserOut(Schema):
     id: int
     username: str
-    role: Literal["admin", "user"]
-    is_env_admin: bool = Field(description="Администратор из .env — через API не изменяется")
+    role: Literal["admin", "user"] = Field(description="Админ - из .env, нельзя изменить через панель")
     created_at: UtcDateTime
 
 
