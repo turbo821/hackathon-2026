@@ -50,7 +50,7 @@ function showDashboard() {
     document.getElementById('dashboard-screen').classList.remove('hidden'); // Показываем дашборд
     document.getElementById('logout-btn').classList.remove('hidden'); // Показываем кнопку выйти
 
-    // Если админ - показываем кнопку добавления
+
     if (myRole === 'admin') {
         document.getElementById('add-payment-btn').classList.remove('hidden');
     } else {
@@ -61,7 +61,7 @@ function showDashboard() {
 }
 
 async function loadPayments() {
-    // ЗАГЛУШКА (фейковые данные для тестов)
+
     let payments = [
     { id: 1, name: 'Аренда офиса', amount: 50000, currency: 'RUB', date: '2023-11-01', status: 'unpaid', paid_by: null },
     { id: 2, name: 'Аренда офиса', amount: 50000, currency: 'RUB', date: '2023-11-01', status: 'unpaid', paid_by: null },

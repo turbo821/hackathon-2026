@@ -13,6 +13,9 @@
             <nav>
                 <ul>
                     <li id="logout-btn" class="hidden"><a href="#" onclick="logout(event)">Выйти</a></li>
+                    <li><a href="#" class="nav-link active" onclick="switchTab('payments', this)">Платежи</a></li>
+                    <li><a href="#" class="nav-link" onclick="switchTab('regular', this)">Регулярные</a></li>
+                    <li><a href="#" class="nav-link" onclick="switchTab('users', this)">Пользователи</a></li>
                 </ul>
             </nav>
         </header>
@@ -26,11 +29,11 @@
                     <input type="email" id="email" placeholder="Почтовый адрес" class="input-field">
                     <input type="password" id="password" placeholder="Пароль" class="input-field">
                     <button class="btn btn-full" onclick="handleLogin()">Войти</button>
-                    <p id="login-error" class="error-text hidden">Неверный логин или пароль</p>
+                    <p id="login-error" class="error-text hidden">Неверный почтовый адрес или пароль</p>
                     <a href="https://t.me/+HrRx337sAeFhOWRi" target="_blank" class="telegram">Привязать Telegram</a>
             </div>
         </div>
-
+<
         <div class="container dashboard-container hidden" id="dashboard-screen">
             
             <div class="dashboard-header">
