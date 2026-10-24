@@ -10,14 +10,18 @@ os.environ["SUPERADMIN_EMAIL"] = "root@example.com"
 # Telegram должен быть «настроен», иначе send_message не вызывается вовсе
 os.environ["TELEGRAM_BOT_TOKEN"] = "test-token"
 os.environ["TELEGRAM_CHAT_ID"] = "-100123"
+# Почту в тестах выключаем: без этого настройки из .env разработчика сделали бы
+# канал активным, и тесты слали бы настоящие письма.
+os.environ["SMTP_PASSWORD"] = ""
 
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy.orm import sessionmaker  # noqa: E402
-
-from app import models  # noqa: E402,F401
-from app import timeutils  # noqa: E402
+from app import (
+    models,  # noqa: E402,F401
+    timeutils,  # noqa: E402
+)
 from app.db import Base, get_db, make_engine  # noqa: E402
 from app.main import app  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
 
 TODAY = date(2026, 10, 23)
 
