@@ -38,5 +38,7 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: str = "*"
 
+    telegram_bot_username: str = ""
+
 
 settings = Settings()

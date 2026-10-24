@@ -59,7 +59,8 @@ def build_message(occ: PaymentOccurrence, on: date) -> str:
         f"<b>{html.escape(occ.name)}</b>\n"
         f"Сумма: <b>{format_amount(occ.amount, occ.currency)}</b>\n"
         f"Валюта: {occ.currency}\n"
-        f"Дата оплаты: <b>{occ.due_date.strftime('%d.%m.%Y')}</b> ({when})"
+        f"Дата оплаты: <b>{occ.due_date.strftime('%d.%m.%Y')}</b> ({when})\n\n"
+        "Оплатили — нажмите кнопку «Оплачено»."
     )
 
 
@@ -122,7 +123,14 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
             logger.info(f"Напоминание по периоду #{occ_id} уже отправлено, пропускаю")
             continue
         try:
-            telegram.send_message(text)
+            telegram.send_message(
+                text,
+                reply_markup={
+                    "inline_keyboard": [
+                        [{"text": "✅ Оплачено", "callback_data": f"pay:{occ.id}"}]
+                    ]
+                },
+            )
             sent += 1
             logger.info(f"Напоминание отправлено: «{name}», срок {due} (период #{occ_id})")
         except Exception:

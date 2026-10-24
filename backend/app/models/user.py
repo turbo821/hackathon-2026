@@ -7,7 +7,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import DateTime, Integer, String, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.config import settings
@@ -29,7 +29,8 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=utcnow, onupdate=utcnow
     )
-
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True, index=True)
+    
     @property
     def is_admin(self) -> bool:
         """Администратор — тот аккаунт, который прописан в .env."""

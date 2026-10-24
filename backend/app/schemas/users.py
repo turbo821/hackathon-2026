@@ -25,6 +25,7 @@ class UserOut(Schema):
     id: int
     username: str
     role: Literal["admin", "user"] = Field(description="Админ - из .env, нельзя изменить через панель")
+    telegram_id: int | None = Field(None, description="Telegram ID: привязан ли аккаунт к боту")
     created_at: UtcDateTime
 
 
@@ -57,6 +58,11 @@ class UserUpdate(Schema):
     def v_password(cls, v):
         return None if v is None else _check_password(v)
 
+class UserMeUpdate(Schema):
+    """Пользователь меняет только свой Telegram ID."""
+    telegram_id: int | None = Field(
+        None, description="Ваш Telegram ID: напишите боту — он ответит"
+    )
 
 class LoginIn(Schema):
     username: str = Field(examples=["admin"])
@@ -68,3 +74,10 @@ class TokenOut(Schema):
     token_type: str = Field(examples=["Bearer"])
     expires_at: UtcDateTime
     user: UserOut
+
+
+class TelegramLinkOut(Schema):
+    """Ссылка для привязки Telegram-аккаунта."""
+    token: str
+    url: str = Field(description="Открыть в Telegram — бот привяжет аккаунт")
+    expires_at: UtcDateTime

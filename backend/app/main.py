@@ -12,7 +12,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.errors import register_error_handlers
 from app.logging_config import get_logger, setup_logging
-from app.routers import auth, misc, payment_occurrences, recurring_payments, summary, users
+from app.routers import (
+    auth,
+    misc,
+    payment_occurrences,
+    payments,
+    recurring_payments,
+    summary,
+    users,
+)
 
 logger = get_logger("main_init")
 
@@ -52,7 +60,9 @@ def create_app(log_name: str = "backend") -> FastAPI:
         openapi_url=f"{API_PREFIX}/openapi.json",
     )
 
-    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()] or ["*"]
+    origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()] or [
+        "*"
+    ]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -62,7 +72,15 @@ def create_app(log_name: str = "backend") -> FastAPI:
     register_error_handlers(app)
 
     api = APIRouter(prefix=API_PREFIX)
-    for module in (auth, recurring_payments, payment_occurrences, summary, users, misc):
+    for module in (
+        auth,
+        recurring_payments,
+        payment_occurrences,
+        payments,
+        summary,
+        users,
+        misc,
+    ):
         api.include_router(module.router)
     app.include_router(api)
 

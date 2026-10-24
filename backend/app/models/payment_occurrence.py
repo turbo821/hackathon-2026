@@ -1,7 +1,15 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Date, DateTime, ForeignKey, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import (
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
@@ -10,6 +18,9 @@ from app.timeutils import utcnow
 STATUS_PAID = "paid"
 STATUS_UNPAID = "unpaid"
 STATUSES = (STATUS_PAID, STATUS_UNPAID)
+PAID_SOURCE_SITE = "site"
+PAID_SOURCE_TELEGRAM = "telegram"
+PAID_SOURCES = (PAID_SOURCE_SITE, PAID_SOURCE_TELEGRAM)
 
 # Вычисляемое состояние периода (в БД не хранится)
 STATE_PENDING = "pending"  # не оплачено, срок не прошёл
@@ -31,7 +42,9 @@ class PaymentOccurrence(Base):
     __tablename__ = "payment_occurrences"
     __table_args__ = (
         # Один период на дату — защита от дублей при параллельной генерации
-        UniqueConstraint("recurring_payment_id", "due_date", name="uq_occurrence_payment_due_date"),
+        UniqueConstraint(
+            "recurring_payment_id", "due_date", name="uq_occurrence_payment_due_date"
+        ),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -46,14 +59,19 @@ class PaymentOccurrence(Base):
     status: Mapped[str] = mapped_column(String(16), default=STATUS_UNPAID, index=True)
     # Фактическая дата оплаты; при отмене отметки очищается
     paid_at: Mapped[date | None] = mapped_column(Date)
-    marked_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    marked_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL")
+    )
+    paid_source: Mapped[str | None] = mapped_column(String(16))
     # Когда платёж прекратили: NULL → платёж активен
     payment_ended_at: Mapped[datetime | None] = mapped_column(DateTime)
     # Когда отправлено напоминание: NULL → ещё не напоминали (защита от дублей)
     reminder_sent_at: Mapped[datetime | None] = mapped_column(DateTime)
-
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utcnow, onupdate=utcnow
+    )
 
     marked_by = relationship("User", foreign_keys=[marked_by_id])
 

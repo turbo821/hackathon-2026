@@ -28,6 +28,7 @@ def occurrence_to_dict(occ: PaymentOccurrence, on: date) -> dict:
         "reminder_sent_at": occ.reminder_sent_at,
         "marked_by": occ.marked_by.username if occ.marked_by else None,
         "payment_ended_at": occ.payment_ended_at,
+        "paid_source": occ.paid_source,
     }
 
 
@@ -43,4 +44,18 @@ def recurring_payment_to_dict(rp: RecurringPayment) -> dict:
         "is_active": rp.is_active,
         "ended_at": rp.ended_at,
         "created_at": rp.created_at,
+    }
+
+def payment_log_to_dict(occ: PaymentOccurrence) -> dict:
+    """Запись журнала оплат: кто, что, когда, откуда."""
+    return {
+        "occurrence_id": occ.id,
+        "recurring_payment_id": occ.recurring_payment_id,
+        "name": occ.name,
+        "amount": occ.amount,
+        "currency": occ.currency,
+        "due_date": occ.due_date,
+        "paid_at": occ.paid_at,
+        "paid_source": occ.paid_source,
+        "paid_by": occ.marked_by.username if occ.marked_by else None,
     }

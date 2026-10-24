@@ -75,6 +75,78 @@
             "HTTPBearer": []
           }
         ]
+      },
+      "patch": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Привязать свой Telegram ID",
+        "description": "Пользователь сам привязывает свой Telegram ID — чтобы бот понимал,\nкто нажал «Оплачено» в сообщении. Передал null — отвязать.",
+        "operationId": "update_me_api_v1_auth_me_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserMeUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/telegram-link": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Ссылка для привязки Telegram-аккаунта",
+        "description": "Одноразовая ссылка: открыть её в Telegram — и бот привяжет аккаунт.\nКод живёт 15 минут и работает один раз: по ссылке, которую кто-то\nпереслал в чат, чужой Telegram привязать нельзя.",
+        "operationId": "telegram_link_api_v1_auth_telegram_link_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelegramLinkOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
       }
     },
     "/api/v1/auth/logout": {
@@ -551,6 +623,131 @@
           },
           "409": {
             "description": "Нельзя исправить дату у неоплаченного периода"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/payments": {
+      "get": {
+        "tags": [
+          "payments"
+        ],
+        "summary": "Журнал оплат (администратор)",
+        "description": "Кто оплатил, сколько, какой платёж, когда и откуда — сайт или Telegram.",
+        "operationId": "payments_log_api_v1_payments_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "User Id"
+            }
+          },
+          {
+            "name": "recurring_payment_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Recurring Payment Id"
+            }
+          },
+          {
+            "name": "date_from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Дата оплаты с (включительно)",
+              "title": "Date From"
+            },
+            "description": "Дата оплаты с (включительно)"
+          },
+          {
+            "name": "date_to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Дата оплаты по (включительно)",
+              "title": "Date To"
+            },
+            "description": "Дата оплаты по (включительно)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentLogOut"
+                  },
+                  "title": "Response Payments Log Api V1 Payments Get"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",
@@ -1191,6 +1388,85 @@
         "title": "OccurrenceUpdate",
         "description": "Передайте status и/или paid_at."
       },
+      "PaymentLogOut": {
+        "properties": {
+          "occurrence_id": {
+            "type": "integer",
+            "title": "Occurrence Id"
+          },
+          "recurring_payment_id": {
+            "type": "integer",
+            "title": "Recurring Payment Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount",
+            "description": "Сумма, до 2 знаков после запятой",
+            "example": "50000.00"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "RUB",
+              "USD",
+              "EUR"
+            ],
+            "title": "Currency"
+          },
+          "due_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Due Date"
+          },
+          "paid_at": {
+            "type": "string",
+            "format": "date",
+            "title": "Paid At"
+          },
+          "paid_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid Source",
+            "description": "site или telegram"
+          },
+          "paid_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Paid By",
+            "description": "Кто оплатил (имя из системы)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "occurrence_id",
+          "recurring_payment_id",
+          "name",
+          "amount",
+          "currency",
+          "due_date",
+          "paid_at",
+          "paid_source",
+          "paid_by"
+        ],
+        "title": "PaymentLogOut",
+        "description": "Запись журнала оплат: кто, что, когда и откуда."
+      },
       "RecurringPaymentCreate": {
         "properties": {
           "name": {
@@ -1384,6 +1660,32 @@
         ],
         "title": "SummaryOut"
       },
+      "TelegramLinkOut": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "Открыть в Telegram — бот привяжет аккаунт"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Expires At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "url",
+          "expires_at"
+        ],
+        "title": "TelegramLinkOut",
+        "description": "Ссылка для привязки Telegram-аккаунта."
+      },
       "TokenOut": {
         "properties": {
           "access_token": {
@@ -1439,6 +1741,25 @@
         ],
         "title": "UserCreate"
       },
+      "UserMeUpdate": {
+        "properties": {
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id",
+            "description": "Ваш Telegram ID: напишите боту — он ответит"
+          }
+        },
+        "type": "object",
+        "title": "UserMeUpdate",
+        "description": "Пользователь меняет только свой Telegram ID."
+      },
       "UserOut": {
         "properties": {
           "id": {
@@ -1457,6 +1778,18 @@
             ],
             "title": "Role",
             "description": "Админ - из .env, нельзя изменить через панель"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id",
+            "description": "Telegram ID: привязан ли аккаунт к боту"
           },
           "created_at": {
             "type": "string",

@@ -23,7 +23,11 @@ API = "/api/v1"
 def sent(monkeypatch):
     """Перехватывает отправку в Telegram и копит тексты сообщений."""
     messages = []
-    monkeypatch.setattr(telegram, "send_message", lambda text, chat_id=None: messages.append(text) or {"ok": True})
+    monkeypatch.setattr(
+        telegram,
+        "send_message",
+        lambda text, chat_id=None, reply_markup=None: messages.append(text) or {"ok": True},
+    )
     return messages
 
 
@@ -193,7 +197,7 @@ def test_deleted_payment_not_reminded_history_kept(client, admin, sent, db):
 def test_failed_telegram_send_is_retried(client, admin, monkeypatch, db):
     calls = []
 
-    def flaky(text, chat_id=None):
+    def flaky(text, chat_id=None, reply_markup=None):
         calls.append(text)
         if len(calls) == 1:
             raise RuntimeError("network down")
