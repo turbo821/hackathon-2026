@@ -1,24 +1,4 @@
 services:
-  # Прокси для исходящих соединений контейнеров.
-  # Нужен там, где из Docker не достучаться до Telegram и npm-реестра
-  # (например, IPv4 к Cloudflare закрыт, а у контейнеров нет IPv6).
-  #
-  # network_mode: host — контейнер делит сетевой стек с хостом, поэтому
-  # его исходящие соединения идут по маршрутам хоста (в том числе через WARP).
-  # Порт 1080 слушается на хосте, контейнеры видят его как
-  # host.docker.internal:1080 (адрес docker0, 172.17.0.1).
-  #
-  # Включается профилем: docker compose --profile proxy up -d
-  # Без профиля сервисы работают как обычно (PROXY_URL пустой — прокси нет).
-  proxy:
-    image: serjs/go-socks5-proxy:latest
-    network_mode: host
-    profiles: ["proxy"]
-    restart: unless-stopped
-    environment:
-      PROXY_USER: ${PROXY_USER:-}
-      PROXY_PASSWORD: ${PROXY_PASSWORD:-}
-
   # API
   backend:
     build: ./backend
@@ -28,13 +8,6 @@ services:
     volumes:
       - ./backend:/app
       - backend_data:/app/instance
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    environment:
-      # Исходящие HTTP(S)-запросы (Telegram) — через прокси.
-      # SMTP (Mail.ru) прокси не поддерживает, но он и так доступен напрямую.
-      ALL_PROXY: ${PROXY_URL:-}
-      NO_PROXY: localhost,127.0.0.1,db,backend,worker,proxy
     restart: unless-stopped
 
   # Панель
@@ -67,11 +40,6 @@ services:
     volumes:
       - ./backend:/app
       - backend_data:/app/instance
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    environment:
-      ALL_PROXY: ${PROXY_URL:-}
-      NO_PROXY: localhost,127.0.0.1,db,backend,worker,proxy
     depends_on:
       - backend
       - xray

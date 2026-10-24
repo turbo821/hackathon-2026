@@ -21,5 +21,4 @@ tzdata
 
 # Тесты
 pytest>=8.0
-# [socks] — поддержка SOCKS5-прокси (исходящие запросы к Telegram идут через него)
-httpx[socks]>=0.27
+httpx>=0.27
