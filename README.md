@@ -61,7 +61,6 @@ docker compose up --build
 |-----|-------|
 | Панель | http://localhost:5173 |
 | Swagger | http://localhost:5000/api/v1/docs |
-| ReDoc | http://localhost:5000/api/v1/redoc |
 | OpenAPI (живая) | http://localhost:5000/api/v1/openapi.json |
 | OpenAPI (файл) | [`backend/openapi.json`](backend/openapi.json) |
 | Проверка живости | http://localhost:5000/api/v1/health |
