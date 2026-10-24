@@ -8,7 +8,6 @@ function showToast(message, type = 'success') {
     toast.textContent = message;
     document.body.appendChild(toast);
 
-    // даём браузеру отрисовать элемент, чтобы сработал transition
     requestAnimationFrame(() => toast.classList.add('show'));
 
     setTimeout(() => {
@@ -29,7 +28,13 @@ async function handleLogin() {
         myRole = 'user';
         localStorage.setItem('token', 'fake-token-user');
         showDashboard();
-    } else if (email === '' || password === ''){
+    } else if (email === 'owner' && password === 'owner') {
+        myRole = 'owner';
+        localStorage.setItem('token', 'fake-token-owner');
+        showDashboard();
+    } else if (email === '' || password === '') {
+        document.getElementById('login-error').classList.remove('hidden');
+    } else {
         document.getElementById('login-error').classList.remove('hidden');
     }
 }
@@ -47,13 +52,14 @@ function showDashboard() {
     document.getElementById('logout-btn').classList.remove('hidden');
 
     const roleSpan = document.getElementById('user-role');
-    roleSpan.innerText = myRole === 'admin' ? 'admin' : 'user';
+    roleSpan.innerText = myRole;
     roleSpan.classList.remove('hidden');
 
     const addPaymentBtn = document.getElementById('add-payment-btn');
     const addUserBtn = document.getElementById('add-user-btn');
 
-    if (myRole === 'admin') {
+    // ЛОГИКА ПРАВ: Админ ИЛИ Овнер видят кнопки
+    if (myRole === 'admin' || myRole === 'owner') {
         if (addPaymentBtn) addPaymentBtn.classList.remove('hidden');
         if (addUserBtn) addUserBtn.classList.remove('hidden');
     } else {
@@ -168,7 +174,7 @@ function createPayment() {
     const date = document.getElementById('new-date').value;
 
     if (!name || !amount || !date) {
-    showToast('Пожалуйста, заполните все поля!', 'error');
+        showToast('Пожалуйста, заполните все поля!', 'error');
         return;
     }
 
@@ -179,9 +185,10 @@ function createPayment() {
         date: date
     };
 
-showToast('Платеж добавлен');
+    showToast('Платеж добавлен');
     closeModal();
 }
+
 function openModal1() {
     document.getElementById('modal-user').classList.remove('hidden');
 }
@@ -201,7 +208,13 @@ function createUser() {
     const password = document.getElementById('new-user-password').value;
 
     if (!name || !email || !password) {
-    showToast('Пожалуйста, заполните все поля!', 'error');
+        showToast('Пожалуйста, заполните все поля!', 'error');
+        return;
+    }
+
+    // Логика проверки: Овнер может создавать админов, а админ - нет
+    if (role === 'admin' && myRole !== 'owner') {
+        showToast('Только Владелец может создавать администраторов!', 'error');
         return;
     }
 
@@ -212,9 +225,10 @@ function createUser() {
         password: password
     };
 
-showToast('Пользователь создан');
+    showToast('Пользователь создан');
     closeModal1();
 }
+
 function switchTab(tabName, element) {
     const links = document.querySelectorAll('.nav-link');
     links.forEach(link => link.classList.remove('active'));
@@ -236,6 +250,8 @@ function switchTab(tabName, element) {
 window.onload = () => {
     if (localStorage.getItem('token')) {
         if(localStorage.getItem('token') === 'fake-token-admin') myRole = 'admin';
+        if(localStorage.getItem('token') === 'fake-token-owner') myRole = 'owner';
+        if(localStorage.getItem('token') === 'fake-token-user') myRole = 'user';
         showDashboard();
     }
 }

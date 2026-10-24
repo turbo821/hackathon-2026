@@ -323,7 +323,6 @@ input[type=number] {
 .badge.purple { background: #3b1b4d; }
 .badge.brown { background: #4d2e1b; }
 
-/* Стили для фильтров над таблицей */
 .filters-container {
     display: flex;
     gap: 10px;
@@ -475,6 +474,34 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     opacity: 1;
 }
 
+/* --- Стили для Toast (всплывающих уведомлений) --- */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: #1c140f;
+    color: #4ade80;
+    border: 1px solid #4ade80;
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    transform: translateY(100px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.toast.error {
+    color: #ff4d4d;
+    border-color: #ff4d4d;
+}
+
+.toast.show {
+    transform: translateY(0);
+    opacity: 1;
+}
+
 @media (max-width: 768px) {
     .header {
         flex-direction: column;
@@ -513,31 +540,4 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         padding: 20px;
         margin: 20px;
     }
-    /* Всплывающее уведомление */
-.toast {
-    position: fixed;
-    bottom: 24px;
-    right: 24px;
-    padding: 14px 22px;
-    border-radius: 8px;
-    background: #22c55e;
-    color: #fff;
-    font-weight: 500;
-    font-size: 14px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-    opacity: 0;
-    transform: translateY(16px);
-    transition: opacity 0.25s ease, transform 0.25s ease;
-    pointer-events: none;
-    z-index: 1000;
-}
-
-.toast.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.toast.error {
-    background: #ef4444;
-}
 }
