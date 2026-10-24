@@ -3,21 +3,21 @@ services:
   # Нужен там, где из Docker не достучаться до Telegram и npm-реестра
   # (например, IPv4 к Cloudflare закрыт, а у контейнеров нет IPv6).
   #
+  # Схема: контейнеры -> SOCKS5 (этот сервис) -> SOCKS5 WARP (127.0.0.1:40000) -> интернет.
   # network_mode: host — контейнер делит сетевой стек с хостом, поэтому
-  # его исходящие соединения идут по маршрутам хоста (в том числе через WARP).
-  # Порт 1080 слушается на хосте, контейнеры видят его как
-  # host.docker.internal:1080 (адрес docker0, 172.17.0.1).
+  # доходит до WARP, который слушает только на loopback.
+  # SOCKS5 слушает 172.17.0.1 (docker0), а не 0.0.0.0 — снаружи недоступен.
   #
   # Включается профилем: docker compose --profile proxy up -d
   # Без профиля сервисы работают как обычно (PROXY_URL пустой — прокси нет).
   proxy:
-    image: serjs/go-socks5-proxy:latest
+    image: ghcr.io/sagernet/sing-box:latest
     network_mode: host
     profiles: ["proxy"]
     restart: unless-stopped
-    environment:
-      PROXY_USER: ${PROXY_USER:-}
-      PROXY_PASSWORD: ${PROXY_PASSWORD:-}
+    volumes:
+      - ./proxy/sing-box.json:/etc/sing-box/config.json:ro
+    command: ["run", "-c", "/etc/sing-box/config.json"]
 
   # API
   backend:
