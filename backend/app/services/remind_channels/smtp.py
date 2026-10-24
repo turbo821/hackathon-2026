@@ -1,8 +1,11 @@
 import smtplib
+import socket
 import ssl
+import struct
 from datetime import date
 from email.message import EmailMessage
 from email.utils import formataddr
+from urllib.parse import urlparse
 
 from app.config import settings
 from app.logging_config import get_logger
@@ -53,19 +56,98 @@ def _build_message(text: str) -> EmailMessage:
     return msg
 
 
+def _recv_exact(sock: socket.socket, size: int) -> bytes:
+    """Читает ровно size байт — recv() может вернуть меньше."""
+    chunks = []
+    while size > 0:
+        chunk = sock.recv(size)
+        if not chunk:
+            raise smtplib.SMTPServerDisconnected("SOCKS5-прокси закрыл соединение")
+        chunks.append(chunk)
+        size -= len(chunk)
+    return b"".join(chunks)
+
+
+def _socks5_connect(proxy_url: str, host: str, port: int) -> socket.socket:
+    """Открывает TCP-соединение до host:port через SOCKS5-прокси.
+
+    smtplib прокси не умеет, поэтому руками: приветствие, CONNECT с именем
+    домена (не IP — иначе TLS-проверка сертификата увидит адрес вместо имени).
+    """
+    parsed = urlparse(proxy_url)
+    proxy_host = parsed.hostname
+    proxy_port = parsed.port or 1080
+    if not proxy_host:
+        raise ValueError(f"Некорректный адрес прокси: {proxy_url}")
+
+    sock = socket.create_connection((proxy_host, proxy_port), timeout=30)
+    sock.settimeout(30)
+    try:
+        # Приветствие: версия 5, единственный метод — без авторизации.
+        sock.sendall(b"\x05\x01\x00")
+        reply = _recv_exact(sock, 2)
+        if reply[0] != 5 or reply[1] != 0:
+            raise smtplib.SMTPServerDisconnected(
+                f"SOCKS5-прокси не согласовался: {reply!r}"
+            )
+
+        # CONNECT: ATYP=3 — имя домена, чтобы TLS знал настоящее имя сервера.
+        target = host.encode("idna")
+        sock.sendall(
+            b"\x05\x01\x00\x03"
+            + bytes([len(target)])
+            + target
+            + struct.pack(">H", port)
+        )
+        response = _recv_exact(sock, 4)
+        if response[1] != 0:
+            raise smtplib.SMTPServerDisconnected(
+                f"SOCKS5-прокси отказал в соединении (код {response[1]})"
+            )
+        # Остаток ответа: bound address и порт — читаем и выбрасываем.
+        atyp = response[3]
+        if atyp == 1:
+            _recv_exact(sock, 4)
+        elif atyp == 3:
+            _recv_exact(sock, _recv_exact(sock, 1)[0])
+        elif atyp == 4:
+            _recv_exact(sock, 16)
+        _recv_exact(sock, 2)
+        return sock
+    except Exception:
+        sock.close()
+        raise
+
+
 def _connect() -> smtplib.SMTP:
     """Открывает соединение с почтовым сервером и логинится.
 
-    Два режима:
+    Три режима:
     - напрямую с TLS на 465 (обычный случай);
-    - напрямую с STARTTLS на 587 — у Mail.ru на 465 отказывает.
+    - напрямую с STARTTLS на 587 — у Mail.ru на 465 отказывает;
+    - через SOCKS5-прокси (SMTP_PROXY) — когда до сервера не достучаться.
     """
     context = ssl.create_default_context()
     host = settings.smtp_host
     port = settings.smtp_port
     password = settings.smtp_password.get_secret_value()
 
-    if settings.smtp_starttls:
+    if settings.smtp_proxy:
+        # smtplib сам прокси не умеет: поднимаем сокет через SOCKS5 руками
+        # и отдаём smtplib готовый сокет.
+        raw = _socks5_connect(settings.smtp_proxy, host, port)
+        server = smtplib.SMTP(timeout=30)
+        server.sock = raw
+        server.file = raw.makefile("rb", encoding="ascii")
+        # starttls() берёт имя сервера из приватного _host: без него TLS
+        # проверит сертификат по пустому имени. Публичного параметра нет.
+        server._host = host  # type: ignore[attr-defined]
+        server.getreply()
+        server.ehlo()
+        if settings.smtp_starttls:
+            server.starttls(context=context)
+            server.ehlo()
+    elif settings.smtp_starttls:
         server = smtplib.SMTP(host, port, timeout=30)
         server.ehlo()
         server.starttls(context=context)
