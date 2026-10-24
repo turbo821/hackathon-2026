@@ -1,14 +1,39 @@
 services:
+  # Прокси для исходящих соединений контейнеров.
+  #
+  # Схема: контейнеры -> xray (SOCKS5/HTTP на 1080/8080) -> интернет.
+  # xray резолвит домены сам и берёт только IPv4: без этого Telegram
+  # отдаёт IPv6-адрес, который дальше по цепочке отклоняется (socks5 code=4).
+  #
+  # Порт xray опубликован только на 127.0.0.1 сервера — снаружи (в интернет)
+  # прокси не видно. Из контейнеров к нему идут по имени сервиса `xray`.
+  #
+  # Если на сервере поднят Cloudflare WARP в режиме туннеля
+  # (`warp-cli --accept-tos mode warp && warp-cli --accept-tos connect`),
+  # трафик контейнеров уходит на хост и дальше в туннель WARP.
   xray:
     image: ghcr.io/xtls/xray-core:latest
     container_name: xray-proxy
     restart: unless-stopped
-    ports:
-      - "1080:1080" # Внешний порт для прокси (при необходимости)
+    command: ["run", "-config", "/etc/xray/config.json"]
+    # Порт наружу не публикуется: прокси нужен только внутри compose-сети
+    # (контейнеры ходят в него по имени сервиса `xray`), а свободный порт
+    # 1080 на сервере может быть занят — и тогда стек не поднимется.
+    # Для отладки с самого сервера раскомментируйте:
+    # ports:
+    #   - "127.0.0.1:1080:1080"
     volumes:
       - ./xray/config.json:/etc/xray/config.json:ro
     networks:
       - app-network
+    # В образе нет shell/nc, поэтому проверяем конфиг самим бинарём xray:
+    # так ловится сломанный или не подхваченный монтированием конфиг.
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/xray", "run", "-test", "-config", "/etc/xray/config.json"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   frontend:
     build:
@@ -17,7 +42,7 @@ services:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     env_file: .env
     ports:
-      - "5173:5173" # Исправлено: если это Vite dev-сервер, порт внутри тоже 5173
+      - "5173:5173" # Vite dev-сервер: порт внутри тоже 5173
     volumes:
       - ./frontend:/app
       - /app/node_modules # Изоляция node_modules контейнера от хоста
@@ -26,7 +51,7 @@ services:
     restart: unless-stopped
     networks:
       - app-network
-      
+
   backend:
     build: ./backend
     env_file: .env
@@ -35,24 +60,45 @@ services:
     volumes:
       - ./backend:/app
       - backend_data:/app/instance
-    restart: unless-stopped
+    # Исходящие HTTP(S)-запросы (Telegram, внешние API) — через xray.
+    # NO_PROXY оставляет внутренние адреса (свой бэкенд, соседние сервисы)
+    # напрямую, иначе они уедут в прокси и сломаются.
+    environment:
+      ALL_PROXY: ${PROXY_URL:-}
+      HTTP_PROXY: ${PROXY_URL:-}
+      HTTPS_PROXY: ${PROXY_URL:-}
+      NO_PROXY: localhost,127.0.0.1,::1,backend,frontend,worker,xray
+      BOT_PROXY_URL: ${BOT_PROXY_URL:-}
+      SMTP_PROXY: ${SMTP_PROXY:-}
     depends_on:
       - xray
+    restart: unless-stopped
     networks:
       - app-network
-  
+
   worker:
     build: ./backend
     env_file: .env
-    # ВАЖНО: добавьте команду, если воркер должен делать что-то отличное от основного backend
-    # command: celery -A your_app worker --loglevel=info  # Пример для Celery
+    # entrypoint переопределён: миграции и сиды выполняет сервис backend,
+    # иначе два процесса будут одновременно менять одну SQLite-базу.
+    entrypoint: ["python", "-m", "app.worker"]
+    volumes:
+      - ./backend:/app
+      - backend_data:/app/instance
+    environment:
+      ALL_PROXY: ${PROXY_URL:-}
+      HTTP_PROXY: ${PROXY_URL:-}
+      HTTPS_PROXY: ${PROXY_URL:-}
+      NO_PROXY: localhost,127.0.0.1,::1,backend,frontend,worker,xray
+      BOT_PROXY_URL: ${BOT_PROXY_URL:-}
+      SMTP_PROXY: ${SMTP_PROXY:-}
     depends_on:
       - backend
       - xray
     restart: unless-stopped
     networks:
       - app-network
-  
+
 volumes:
   backend_data:
 
