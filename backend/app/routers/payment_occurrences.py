@@ -18,7 +18,7 @@ from app.models.payment_occurrence import (
     STATUS_UNPAID,
 )
 from app.schemas.payments import Currency, OccurrenceOut, OccurrenceUpdate, Status
-from app.services.periods import ensure_all_occurrences, ensure_occurrences
+from app.services.periods import ensure_all_occurrences, ensure_occurrences, remove_extra_unpaid
 from app.services.serializers import occurrence_to_dict
 from app.timeutils import today
 
@@ -77,7 +77,7 @@ def list_occurrences(
     include_future: bool = Query(
         True, description="Включать ещё не наступившие периоды"
     ),
-    order: Literal["asc", "desc"] = "asc",
+    order: Literal["asc", "desc"] = "desc",
 ):
     """Каждый элемент — конкретный период регулярного платежа со своим сроком и статусом.
 
