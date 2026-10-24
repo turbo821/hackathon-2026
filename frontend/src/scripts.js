@@ -23,6 +23,7 @@ let currentFilter = 'all';
 let paymentsRequestId = 0;
 let usersCache = [];
 let editingUserId = null;
+let pendingConfirmation = null;
 
 // ---------- Утилиты ----------
 
@@ -320,6 +321,47 @@ function changePaidDate(id, value) {
     updateOccurrence(id, { paid_at: value }, 'Дата оплаты исправлена');
 }
 
+// ---------- Красивое подтверждение опасных действий ----------
+
+function showConfirm({ title, message, confirmText = 'Подтвердить' }) {
+    const overlay = $('confirm-modal');
+    $('confirm-title').textContent = title;
+    $('confirm-message').textContent = message;
+    $('confirm-accept').textContent = confirmText;
+    overlay.classList.remove('hidden');
+    overlay.setAttribute('aria-hidden', 'false');
+
+    return new Promise((resolve) => {
+        pendingConfirmation = (result) => {
+            overlay.classList.add('hidden');
+            overlay.setAttribute('aria-hidden', 'true');
+            pendingConfirmation = null;
+            resolve(result);
+        };
+        $('confirm-cancel').focus();
+    });
+}
+
+function resolveConfirmation(result) {
+    if (pendingConfirmation) pendingConfirmation(result);
+}
+
+function initConfirmModal() {
+    const overlay = $('confirm-modal');
+    if (!overlay) return;
+
+    $('confirm-accept').addEventListener('click', () => resolveConfirmation(true));
+    $('confirm-cancel').addEventListener('click', () => resolveConfirmation(false));
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) resolveConfirmation(false);
+    });
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !overlay.classList.contains('hidden')) {
+            resolveConfirmation(false);
+        }
+    });
+}
+
 // ---------- Регулярные платежи (шаблоны) ----------
 
 async function loadRecurring() {
@@ -355,7 +397,13 @@ async function loadRecurring() {
 }
 
 async function stopPayment(id) {
-    if (!confirm('Прекратить платёж? Напоминания прекратятся, будущие неоплаченные периоды удалятся, история сохранится.')) return;
+    const confirmed = await showConfirm({
+        title: 'Прекратить платёж?',
+        message: 'Напоминания прекратятся, будущие неоплаченные периоды удалятся, а история оплат сохранится.',
+        confirmText: 'Прекратить'
+    });
+    if (!confirmed) return;
+
     try {
         await api(`/recurring-payments/${id}`, { method: 'DELETE' });
         showToast('Платёж прекращён');
@@ -526,7 +574,14 @@ async function createUser() {
 
 async function deleteUser(id) {
     const user = usersCache.find((u) => u.id === id);
-    if (!confirm(`Удалить пользователя ${user ? user.username : ''}? История оплат сохранится.`)) return;
+    const confirmed = await showConfirm({
+        title: 'Удалить пользователя?',
+        message: `Пользователь «${user ? user.username : ''}» будет удалён. История оплат сохранится.`,
+        confirmText: 'Удалить',
+        icon: '!',
+    });
+    if (!confirmed) return;
+
     try {
         await api(`/users/${id}`, { method: 'DELETE' });
         showToast('Пользователь удалён');
@@ -556,4 +611,5 @@ Object.assign(window, {
     openModal1, closeModal1, createUser, editUser, deleteUser,
 });
 
+initConfirmModal();
 init();
