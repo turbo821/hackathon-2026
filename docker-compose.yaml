@@ -1,17 +1,5 @@
 services:
-  db:
-    image: postgres:16-alpine
-    env_file: .env
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
+  # API
   backend:
     build: ./backend
     env_file: .env
@@ -19,10 +7,9 @@ services:
       - "5000:5000"
     volumes:
       - ./backend:/app
-    depends_on:
-      db:
-        condition: service_healthy
+    restart: unless-stopped
 
+  # Панель
   frontend:
     build: ./frontend
     env_file: .env
@@ -34,5 +21,15 @@ services:
     depends_on:
       - backend
 
-volumes:
-  pgdata:
+  # Фоновые напоминания в Telegram.
+  # entrypoint переопределён: миграции и сиды выполняет сервис backend,
+  # иначе два процесса будут одновременно менять одну SQLite-базу.
+  worker:
+    build: ./backend
+    env_file: .env
+    entrypoint: ["python", "-m", "app.worker"]
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+    restart: unless-stopped
