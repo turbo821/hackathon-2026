@@ -3,7 +3,6 @@
 from datetime import timedelta
 
 import pytest
-
 from app.models import PaymentOccurrence, RecurringPayment, TelegramLink, User
 from app.services import telegram
 from app.services.bot import handle_pay_button, handle_start, handle_update
@@ -17,7 +16,9 @@ def sent(monkeypatch):
     monkeypatch.setattr(
         telegram,
         "send_message",
-        lambda text, chat_id=None, reply_markup=None: messages.append(text) or {"ok": True},
+        lambda text, chat_id=None, reply_markup=None: (
+            messages.append(text) or {"ok": True}
+        ),
     )
     return messages
 
@@ -28,7 +29,7 @@ def tg_user(db):
 
     Фикстура user из conftest отдаёт заголовки авторизации, а не объект User.
     """
-    user = User(username="ivan", password_hash="x")
+    user = User(username="ivan", email="ivan@example.com", password_hash="x")
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -39,7 +40,9 @@ def make_link(db, user, token="tok123", expired=False):
     link = TelegramLink(
         token=token,
         user_id=user.id,
-        expires_at=utcnow() - timedelta(minutes=1) if expired else utcnow() + timedelta(minutes=15),
+        expires_at=utcnow() - timedelta(minutes=1)
+        if expired
+        else utcnow() + timedelta(minutes=15),
     )
     db.add(link)
     db.commit()
@@ -48,14 +51,22 @@ def make_link(db, user, token="tok123", expired=False):
 
 def make_occurrence(db, user, amount="1000.00"):
     rp = RecurringPayment(
-        name="Аренда", amount=amount, currency="RUB", period="monthly",
-        first_due_date=utcnow().date(), anchor_day=utcnow().day,
+        name="Аренда",
+        amount=amount,
+        currency="RUB",
+        period="monthly",
+        first_due_date=utcnow().date(),
+        anchor_day=utcnow().day,
     )
     db.add(rp)
     db.flush()
     occ = PaymentOccurrence(
-        recurring_payment_id=rp.id, name=rp.name, amount=rp.amount, currency=rp.currency,
-        due_date=rp.first_due_date, status="unpaid",
+        recurring_payment_id=rp.id,
+        name=rp.name,
+        amount=rp.amount,
+        currency=rp.currency,
+        due_date=rp.first_due_date,
+        status="unpaid",
     )
     db.add(occ)
     db.commit()
@@ -117,5 +128,7 @@ def test_pay_button_on_already_paid_period(db, tg_user):
 
 
 def test_message_without_start_reports_telegram_id(db, sent):
-    handle_update(db, {"message": {"chat": {"id": 1}, "from": {"id": 777001}, "text": "привет"}})
+    handle_update(
+        db, {"message": {"chat": {"id": 1}, "from": {"id": 777001}, "text": "привет"}}
+    )
     assert sent and "777001" in sent[0]

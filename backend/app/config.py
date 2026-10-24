@@ -1,3 +1,4 @@
+from pydantic import BaseModel, EmailStr, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,16 +21,26 @@ class Settings(BaseSettings):
     # --- Администратор (только из .env, через API не управляется) ---
     admin_username: str = "admin"
     admin_password: str = "admin"
+    admin_email: str = "admin@example.com"
 
     # --- Даты ---
     # Единый часовой пояс приложения: «сегодня», просрочка и напоминания считаются в нём
     app_timezone: str = "Europe/Moscow"
 
     # --- Напоминания ---
-    telegram_bot_token: str = ""
-    telegram_chat_id: str = ""
     reminder_days_before: int = 3
     reminder_check_interval_seconds: int = 60
+    # --- Telegram ---
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
+    # --- SMTP ---
+    smtp_host: str = "smtp.mail.ru"
+    smtp_port: int = 465
+    smtp_user: str = ""
+    smtp_addr: EmailStr = "cheremsha_invoke_keeper@mail.ru"
+    smtp_password: SecretStr = SecretStr("")
+    smtp_name: str = "Invoice Keeper"
+    smtp_subject: str = "Напоминание об оплате"
 
     # --- Тестовые данные ---
     # Скрипт scripts.seed_demo создаёт демо-платежи (аренда/сервер/подписка).
