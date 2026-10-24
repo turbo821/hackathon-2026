@@ -53,6 +53,7 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+    restart: unless-stopped
 
   # Фоновые напоминания в Telegram.
   # entrypoint переопределён: миграции и сиды выполняет сервис backend,
