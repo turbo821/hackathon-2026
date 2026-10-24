@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # --- Telegram ---
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    # Чат, в который пользователи вступают по ссылке с сайта. Бот должен быть
+    # в нём администратором с правом can_invite_users.
+    telegram_group_chat_id: str = ""
     # --- SMTP ---
     smtp_host: str = "smtp.mail.ru"
     smtp_port: int = 465

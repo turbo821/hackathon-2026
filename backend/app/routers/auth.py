@@ -1,15 +1,22 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from app.config import settings
 from fastapi import APIRouter
 from sqlalchemy import delete, select
 
 from app.auth import DB, Auth, CurrentUser, create_access_token, verify_password
+from app.config import settings
 from app.errors import ApiError
 from app.models import RevokedToken, TelegramLink, User
 from app.schemas.common import MessageOut
-from app.schemas.users import LoginIn, TelegramLinkOut, TokenOut, UserMeUpdate, UserOut
+from app.schemas.users import (
+    LoginIn,
+    TelegramChatLinkOut,
+    TelegramLinkOut,
+    TokenOut,
+    UserMeUpdate,
+    UserOut,
+)
 from app.services import telegram
 from app.timeutils import utcnow
 
@@ -88,6 +95,47 @@ def telegram_link(db: DB, user: CurrentUser):
         "url": f"https://t.me/{username}?start={token}",
         "expires_at": expires_at,
     }
+
+
+@router.post(
+    "/telegram-chat-link",
+    response_model=TelegramChatLinkOut,
+    summary="Ссылка-приглашение в чат для привязки Telegram-аккаунта",
+)
+def telegram_chat_link(db: DB, user: CurrentUser):
+    """Персональная ссылка-приглашение в чат.
+
+    Пользователь открывает её и вступает в чат. Бот получает событие
+    «кто вступил», достаёт из имени ссылки код и записывает Telegram ID
+    в карточку того, кто пришёл с сайта.
+    """
+    if not settings.telegram_group_chat_id:
+        raise ApiError(
+            503, "Не задан TELEGRAM_GROUP_CHAT_ID — чат для приглашений не настроен"
+        )
+
+    # Код спрятан в имени ссылки-приглашения: Telegram отдаёт его в событии
+    # о вступлении. Ограничение Telegram — 32 символа, поэтому код короче.
+    token = uuid.uuid4().hex[:24]
+    expires_at = utcnow() + timedelta(minutes=LINK_TTL_MINUTES)
+
+    try:
+        invite_link = telegram.create_chat_invite_link(
+            settings.telegram_group_chat_id, name=token
+        )
+    except telegram.TelegramError as e:
+        raise ApiError(502, f"Telegram не смог создать ссылку-приглашение: {e}")
+
+    db.add(
+        TelegramLink(
+            token=token,
+            user_id=user.id,
+            expires_at=expires_at,
+            chat_invite_link=invite_link,
+        )
+    )
+    db.commit()
+    return {"token": token, "url": invite_link, "expires_at": expires_at}
 
 
 @router.post("/logout", response_model=MessageOut, summary="Завершение текущей сессии")

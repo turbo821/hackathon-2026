@@ -7,6 +7,9 @@
 Токен и чат — только в .env (он в .gitignore).
 """
 
+import json
+from typing import Any
+
 import httpx
 
 from app.config import settings
@@ -38,10 +41,12 @@ def is_configured() -> bool:
     return bool(settings.telegram_bot_token and settings.telegram_chat_id)
 
 
-def _call(
-    method: str, payload: dict | None = None, timeout: int = TIMEOUT
-) -> dict | list:
-    """Один вызов Bot API. Бросает TelegramError с описанием от Telegram."""
+def _call(method: str, payload: dict | None = None, timeout: int = TIMEOUT) -> Any:
+    """Один вызов Bot API. Бросает TelegramError с описанием от Telegram.
+
+    Возвращает то, что прислал Telegram в поле result: для большинства
+    методов это dict, но getUpdates отдаёт список.
+    """
     if not has_token():
         raise TelegramNotConfigured("TELEGRAM_BOT_TOKEN не задан в .env")
 
@@ -77,7 +82,7 @@ def bot_username() -> str:
     if settings.telegram_bot_username:
         return settings.telegram_bot_username
     if _bot_username is None:
-        _bot_username = (get_me() or {}).get("username", "")
+        _bot_username = str((get_me() or {}).get("username") or "")
         logger.info(f"Telegram: имя бота @{_bot_username}")
     return _bot_username
 
@@ -134,14 +139,40 @@ def answer_callback(callback_id: str, text: str = "") -> dict:
     )
 
 
-def get_updates(offset: int | None = None, timeout: int = 25) -> list[dict]:
+def get_updates(
+    offset: int | None = None,
+    timeout: int = 25,
+    allowed_updates: list[str] | None = None,
+) -> list[dict]:
     """Забирает накопленные обновления (long polling).
 
     offset — id последнего обработанного обновления: Telegram пришлёт только
     новые, а старые перестанут приходить.
+
+    allowed_updates — какие типы событий присылать. По умолчанию Telegram
+    не шлёт chat_member (события «кто вступил в чат»), поэтому список нужно
+    задавать явно.
     """
-    payload: dict = {"timeout": timeout}
+    payload: dict[str, Any] = {"timeout": timeout}
     if offset is not None:
         payload["offset"] = offset
-    result = _call("getUpdates", payload, timeout=timeout + 10)
+    if allowed_updates is not None:
+        payload["allowed_updates"] = json.dumps(allowed_updates)
+    result = _call("getUpdates", payload)
     return result if isinstance(result, list) else []
+
+
+def create_chat_invite_link(chat_id: str | int, name: str) -> str:
+    """Создаёт персональную ссылку-приглашение в чат.
+
+    name (до 32 символов) попадёт в invite_link.name события о вступлении —
+    именно туда кладём код привязки, чтобы по событию «пользователь вступил»
+    понять, кого привязывать.
+
+    Бот должен быть администратором чата с правом can_invite_users.
+    """
+    result = _call("createChatInviteLink", {"chat_id": chat_id, "name": name})
+    link = result.get("invite_link") if isinstance(result, dict) else None
+    if not link:
+        raise TelegramError("Telegram не вернул ссылку-приглашение")
+    return str(link)

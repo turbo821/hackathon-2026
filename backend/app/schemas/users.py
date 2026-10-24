@@ -118,3 +118,11 @@ class TelegramLinkOut(Schema):
     token: str
     url: str = Field(description="Открыть в Telegram — бот привяжет аккаунт")
     expires_at: UtcDateTime
+
+
+class TelegramChatLinkOut(Schema):
+    """Ссылка-приглашение в чат: по ней бот узнаёт Telegram ID вошедшего."""
+
+    token: str
+    url: str = Field(description="Ссылка-приглашение в чат Telegram")
+    expires_at: UtcDateTime

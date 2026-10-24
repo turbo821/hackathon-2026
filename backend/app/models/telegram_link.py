@@ -10,9 +10,13 @@ from app.timeutils import utcnow
 class TelegramLink(Base):
     """Одноразовый код привязки Telegram-аккаунта к пользователю системы.
 
-    Панель просит код и кладёт его в ссылку ?start=<token>. Бот получает
-    /start <token> и по нему понимает, кого привязывать. Код живёт 15 минут
-    и работает один раз.
+    Два способа привязаться, оба по одному и тому же коду:
+    - панель кладёт код в ссылку ?start=<token>, бот получает /start <token>;
+    - панель просит у бота персональную ссылку-приглашение в чат, код спрятан
+      в имени ссылки (invite_link.name), и бот привязывает аккаунт по событию
+      «пользователь вступил в чат».
+
+    Код живёт 15 минут и работает один раз.
     """
 
     __tablename__ = "telegram_links"
@@ -26,3 +30,5 @@ class TelegramLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     # Момент использования: код одноразовый
     used_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Созданная ботом ссылка-приглашение в чат (если привязка идёт через вступление)
+    chat_invite_link: Mapped[str | None] = mapped_column(String(255))
