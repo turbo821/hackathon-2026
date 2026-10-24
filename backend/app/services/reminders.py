@@ -120,6 +120,13 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
             try:
                 channel.send_message(text, reply_markup=_reply_markup(channel, occ_id))
                 success = True
+            except NotImplementedError:
+                # Канал ещё не дописан — молчаливый «успех» здесь был бы хуже:
+                # период считался бы отправленным, и напоминание потерялось бы.
+                logger.warning(
+                    f"Канал {channel.__name__} ещё не дописан — "
+                    f"напоминание по периоду #{occ_id} в него не ушло"
+                )
             except Exception:
                 logger.exception(
                     f"Не удалось отправить напоминание по периоду #{occ_id} "

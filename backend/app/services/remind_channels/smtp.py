@@ -15,9 +15,11 @@ supports_reply_markup = False
 
 
 def ready_to_send() -> bool:
+    # Логин на почтовом сервере — это сам адрес ящика (SMTP_ADDR),
+    # отдельного SMTP_USER у нас нет.
     return bool(
         settings.smtp_host
-        and settings.smtp_user
+        and settings.smtp_addr
         and settings.smtp_password.get_secret_value()
     )
 
@@ -49,7 +51,7 @@ def _send_message_to(email: EmailStr, text: str) -> None:
     with smtplib.SMTP_SSL(
         settings.smtp_host, settings.smtp_port, context=context, timeout=15
     ) as server:
-        server.login(settings.smtp_user, password)
+        server.login(str(settings.smtp_addr), password)
         server.send_message(msg)
 
 

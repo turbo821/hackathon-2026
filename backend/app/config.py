@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # --- Администратор (только из .env, через API не управляется) ---
     admin_username: str = "admin"
     admin_password: str = "admin"
-    admin_email: str = "admin@example.com"
+    admin_email: EmailStr = "admin@example.com"
 
     # --- Даты ---
     # Единый часовой пояс приложения: «сегодня», просрочка и напоминания считаются в нём
@@ -36,8 +36,9 @@ class Settings(BaseSettings):
     # --- SMTP ---
     smtp_host: str = "smtp.mail.ru"
     smtp_port: int = 465
-    smtp_user: str = ""
-    smtp_addr: EmailStr = "cheremsha_invoke_keeper@mail.ru"
+    # Адрес ящика (он же логин на сервере) и пароль задаются только в .env:
+    # в коде секреты и чужие адреса не держим.
+    smtp_addr: EmailStr | None = None
     smtp_password: SecretStr = SecretStr("")
     smtp_name: str = "Invoice Keeper"
     smtp_subject: str = "Напоминание об оплате"
