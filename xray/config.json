@@ -1,0 +1,62 @@
+{
+  "log": {
+    "loglevel": "info",
+    "access": "",
+    "error": ""
+  },
+  "inbounds": [
+    {
+      "tag": "http-in",
+      "port": 1080,
+      "protocol": "tcp",
+      "settings": {
+        "allowTransparent": false
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls"]
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "to-frontend",
+      "protocol": "freedom",
+      "settings": {
+        "redirect": "frontend:5173"
+      }
+    },
+    {
+      "tag": "to-backend",
+      "protocol": "freedom",
+      "settings": {
+        "redirect": "backend:5000"
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    }
+  ],
+  "routing": {
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": ["http-in"],
+        "path": ["/api/*", "/v1/*", "/auth/*", "/docs", "/openapi.json"],
+        "outboundTag": "to-backend"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["http-in"],
+        "domain": ["api.localhost", "backend"],
+        "outboundTag": "to-backend"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["http-in"],
+        "outboundTag": "to-frontend"
+      }
+    ]
+  }
+}
