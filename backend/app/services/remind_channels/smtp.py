@@ -36,28 +36,31 @@ def build_message(occ: PaymentOccurrence, on: date) -> str:
     )
 
 
-def _send_message_to(email: str, text: str) -> None:
-    """Отправляет одно письмо одному адресату."""
-    if not settings.smtp_addr:
-        raise RuntimeError("SMTP_ADDR не задан — некуда отправлять письма")
+def _build_message(text: str) -> EmailMessage:
+    """Собирает одно письмо для пачки получателей.
 
+    В заголовке To — undisclosed-recipients: адреса других получателей не
+    должны светиться в чужих письмах. В конверте письма (RCPT TO) они всё
+    равно будут — их подставляет sendmail.
+    """
     msg = EmailMessage()
     msg["Subject"] = settings.smtp_subject
     msg["From"] = formataddr((settings.smtp_name, str(settings.smtp_addr)))
-    msg["To"] = email
+    msg["To"] = "undisclosed-recipients:;"
 
-    # Добавляем plain-text fallback и HTML-версию
     msg.set_content("Для просмотра письма используйте клиент с поддержкой HTML.")
     msg.add_alternative(text, subtype="html")
+    return msg
 
-    password = settings.smtp_password.get_secret_value()
+
+def _connect() -> smtplib.SMTP_SSL:
+    """Открывает соединение с почтовым сервером и логинится."""
     context = ssl.create_default_context()
-
-    with smtplib.SMTP_SSL(
-        settings.smtp_host, settings.smtp_port, context=context, timeout=15
-    ) as server:
-        server.login(str(settings.smtp_addr), password)
-        server.send_message(msg)
+    server = smtplib.SMTP_SSL(
+        settings.smtp_host, settings.smtp_port, context=context, timeout=30
+    )
+    server.login(str(settings.smtp_addr), settings.smtp_password.get_secret_value())
+    return server
 
 
 def send_message(
@@ -65,7 +68,7 @@ def send_message(
     reply_markup: dict | None = None,
     recipients: list[str] | None = None,
 ) -> int:
-    """Рассылает письмо всем получателям — по одному письму на адрес.
+    """Рассылает письмо пачкой: одно соединение, одно письмо на всех.
 
     Получателей (адреса из базы) передаёт вызывающий: так правило «кому
     писать» живёт в одном месте, а канал только отправляет.
@@ -77,19 +80,33 @@ def send_message(
         logger.warning("Нет получателей с email — письмо не отправлено")
         return 0
 
-    sent = 0
-    failed: list[str] = []
-    for address in recipients:
-        try:
-            _send_message_to(address, text)
-            sent += 1
-        except Exception:
-            failed.append(address)
-            # logger.exception сам добавляет трассировку — текст ошибки в нём лишний
-            logger.exception(f"Не удалось отправить письмо на {address}")
+    if not settings.smtp_addr:
+        raise RuntimeError("SMTP_ADDR не задан — некуда отправлять письма")
 
+    # sendmail сам делает всю пачку: один MAIL FROM, по RCPT TO на каждого
+    # получателя и один DATA. Соединение и вход — тоже одни на всю рассылку,
+    # поэтому лимиты почтового сервера не растут вместе с числом получателей.
+    try:
+        with _connect() as server:
+            refused = server.sendmail(
+                str(settings.smtp_addr),
+                recipients,
+                # as_bytes обязателен: sendmail кодирует str как ASCII,
+                # а в письме есть кириллица.
+                _build_message(text).as_bytes(),
+            )
+    except smtplib.SMTPRecipientsRefused as e:
+        # Часть адресов сервер не принял — остальные письмо получили.
+        # sendmail бросает это исключение и когда отказали все.
+        refused = e.recipients
+    except smtplib.SMTPException:
+        logger.exception("Письмо не отправлено")
+        return 0
+
+    failed = list(refused)
+    delivered = len(recipients) - len(failed)
     logger.info(
-        f"Письмо отправлено {sent} из {len(recipients)} получателей"
+        f"Письмо отправлено {delivered} из {len(recipients)} получателей"
         + (f"; не доставлено: {', '.join(failed)}" if failed else "")
     )
-    return sent
+    return delivered
