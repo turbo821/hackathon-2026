@@ -14,17 +14,17 @@ services:
       - backend_data:/app/instance
     restart: unless-stopped
 
-  # Панель
+  # Панель: статика, собранная Vite, раздаётся через nginx.
   frontend:
-    build: ./frontend
-    env_file: .env
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api/v1}
     ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "80:80"
     depends_on:
       - backend
+    restart: unless-stopped
 
   # Фоновые напоминания в Telegram.
   # entrypoint переопределён: миграции и сиды выполняет сервис backend,
