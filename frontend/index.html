@@ -8,8 +8,7 @@
 </head>
 <body>
     <div class="wrapper">
-                <header class="container header">
-
+        <header class="container header">
             <span class="logo">Invoice Keeper</span>
             
             <nav id="main-nav" class="hidden">
@@ -37,52 +36,69 @@
                     <button class="btn btn-full" onclick="handleLogin()">Войти</button>
                     <p id="login-error" class="error-text hidden">Неверный почтовый адрес или пароль</p>
                     <a href="https://t.me/+HrRx337sAeFhOWRi" target="_blank" class="telegram">Привязать Telegram</a>
-                </div> 
+                </div>
             </div>
-        </div> 
-        <div class="container dashboard-container hidden" id="dashboard-screen">
+        </div>
+
+        <div id="dashboard-screen" class="hidden">
             
-            <div class="dashboard-header">
-                <h2>Мои платежи</h2>
-                <button id="add-payment-btn" class="btn hidden" onclick="openModal()">+ Добавить платеж</button>
+            <div class="container dashboard-container" id="tab-payments">
+                <div class="dashboard-header">
+                    <h2>Мои платежи</h2>
+                    <button id="add-payment-btn" class="btn hidden" onclick="openModal()">+ Добавить платеж</button>
+                </div>
+
+                <div class="work blocks summary-cards">
+                    <div class="block summary-card">
+                        <span class="badge green">RUB</span>
+                        <h3 id="sum-rub" class="summary-amount">0 ₽</h3>
+                        <p>Итого к оплате</p>
+                    </div>
+                    <div class="block summary-card">
+                        <span class="badge purple">USD</span>
+                        <h3 id="sum-usd" class="summary-amount">$0</h3>
+                        <p>Итого к оплате</p>
+                    </div>
+                    <div class="block summary-card">
+                        <span class="badge brown">EUR</span>
+                        <h3 id="sum-eur" class="summary-amount">€0</h3>
+                        <p>Итого к оплате</p>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Оплатил</th>
+                                <th>Название</th>
+                                <th>Сумма</th>
+                                <th>Срок</th>
+                                <th>Статус</th>
+                                <th>Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody id="payments-table-body"></tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="work blocks summary-cards">
-                <div class="block summary-card">
-                    <span class="badge green">RUB</span>
-                    <h3 id="sum-rub" class="summary-amount">0 ₽</h3>
-                    <p>Итого к оплате</p>
+            <div class="container dashboard-container hidden" id="tab-regular">
+                <div class="dashboard-header">
+                    <h2>Регулярные платежи</h2>
+                    <button class="btn" onclick="alert('Функционал в разработке')">+ Добавить шаблон</button>
                 </div>
-                <div class="block summary-card">
-                    <span class="badge purple">USD</span>
-                    <h3 id="sum-usd" class="summary-amount">$0</h3>
-                    <p>Итого к оплате</p>
-                </div>
-                <div class="block summary-card">
-                    <span class="badge brown">EUR</span>
-                    <h3 id="sum-eur" class="summary-amount">€0</h3>
-                    <p>Итого к оплате</p>
-                </div>
+                <p style="color: #ccc; margin-top: 20px;">Здесь будет список шаблонов регулярных платежей.</p>
             </div>
 
-
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Оплатил</th>
-                            <th>Название</th>
-                            <th>Сумма</th>
-                            <th>Срок</th>
-                            <th>Статус</th>
-                            <th>Действие</th>
-                        </tr>
-                    </thead>
-                    <tbody id="payments-table-body">
-
-                    </tbody>
-                </table>
+            <div class="container dashboard-container hidden" id="tab-users">
+                <div class="dashboard-header">
+                    <h2>Пользователи</h2>
+                    <button class="btn" onclick="alert('Функционал в разработке')">+ Добавить пользователя</button>
+                </div>
+                <p style="color: #ccc; margin-top: 20px;">Здесь будет список пользователей системы.</p>
             </div>
+
         </div>
     </div>
 
