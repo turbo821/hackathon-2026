@@ -21,5 +21,7 @@ tzdata
 
 # Тесты
 pytest>=8.0
+
 httpx>=0.27
-httpx[socks]>=0.24.0
+
+httpx[socks]>=0.27
