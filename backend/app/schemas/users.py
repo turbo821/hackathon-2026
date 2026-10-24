@@ -8,6 +8,9 @@ from app.schemas.common import Schema, UtcDateTime
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-]{3,64}$")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Через API назначаются только эти роли: суперадмин один и задаётся в .env
+AssignableRole = Literal["admin", "user"]
+
 
 def _check_username(value: str) -> str:
     value = value.strip()
@@ -33,7 +36,10 @@ class UserOut(Schema):
     id: int
     username: str
     email: str
-    role: Literal["admin", "user"] = Field(description="Админ - из .env, нельзя изменить через панель")
+    role: Literal["superadmin", "admin", "user"] = Field(
+        description="superadmin — из .env, через панель не меняется; "
+        "admin — назначает суперадмин; user — обычный пользователь"
+    )
     created_at: UtcDateTime
 
 
@@ -41,6 +47,7 @@ class UserCreate(Schema):
     username: str = Field(examples=["ivan"])
     password: str = Field(examples=["secret123"])
     email: str = Field(examples=["ivan@example.com"])
+    role: AssignableRole = Field("user", description="admin может назначить только суперадмин")
 
     @field_validator("username")
     @classmethod
@@ -62,6 +69,7 @@ class UserUpdate(Schema):
     username: str | None = None
     password: str | None = None
     email: str | None = None
+    role: AssignableRole | None = Field(None, description="Менять роль может только суперадмин")
 
     @field_validator("username")
     @classmethod
@@ -80,13 +88,13 @@ class UserUpdate(Schema):
 
 
 class LoginIn(Schema):
-    email: str = Field(examples=["admin@example.com"])
-    password: str = Field(examples=["admin"])
+    email: str = Field(examples=["superadmin@example.com"])
+    password: str = Field(examples=["superadmin"])
 
     @field_validator("email")
     @classmethod
     def v_email(cls, v: str) -> str:
-        # Без проверки формата: неверный email — это просто «неверный логин или пароль»
+        # Без проверки формата: неверный email — это просто «неверный email или пароль»
         return v.strip().lower()
 
 

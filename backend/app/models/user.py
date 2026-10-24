@@ -1,8 +1,13 @@
 """Пользователь панели.
 
-Администратор — ровно один, и он прописан в .env (ADMIN_USERNAME).
-Поэтому в таблице нет колонок role/is_env_admin: роль вычисляется из логина,
-и база не может разойтись с настройкой.
+Роли:
+- superadmin — ровно один, прописан в .env (SUPERADMIN_*). Может всё,
+  что администратор, и вдобавок управляет администраторами;
+- admin — создаётся суперадмином через API;
+- user — обычный пользователь.
+
+Роль хранится в БД. Роль суперадмина при каждом старте выставляет
+сид scripts.seed_superadmin по данным из .env.
 """
 
 from datetime import datetime
@@ -10,13 +15,13 @@ from datetime import datetime
 from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.config import settings
 from app.db import Base
 from app.timeutils import utcnow
 
+ROLE_SUPERADMIN = "superadmin"
 ROLE_ADMIN = "admin"
 ROLE_USER = "user"
-ROLES = (ROLE_ADMIN, ROLE_USER)
+ROLES = (ROLE_SUPERADMIN, ROLE_ADMIN, ROLE_USER)
 
 
 class User(Base):
@@ -26,19 +31,20 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
     password_hash: Mapped[str] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(16), default=ROLE_USER)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=utcnow, onupdate=utcnow
     )
 
     @property
-    def is_admin(self) -> bool:
-        """Администратор — тот аккаунт, который прописан в .env."""
-        return self.username.strip().lower() == settings.admin_username.strip().lower()
+    def is_superadmin(self) -> bool:
+        return self.role == ROLE_SUPERADMIN
 
     @property
-    def role(self) -> str:
-        return ROLE_ADMIN if self.is_admin else ROLE_USER
+    def is_admin(self) -> bool:
+        """Права администратора: у администратора и у суперадмина."""
+        return self.role in (ROLE_ADMIN, ROLE_SUPERADMIN)
 
     def __repr__(self) -> str:
         return f"<User {self.id} {self.username} ({self.role})>"

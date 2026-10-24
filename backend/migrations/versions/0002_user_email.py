@@ -6,20 +6,24 @@ Create Date: 2026-10-24
 
 Свежая база: 0001 создаёт таблицы по моделям, колонка email уже есть — пропускаем.
 Старая база: добавляем колонку, заполняем существующих пользователей
-(администратор — ADMIN_EMAIL из .env, остальные — <логин>@example.com),
+(прежний админ — ADMIN_EMAIL, остальные — <логин>@example.com),
 затем делаем её NOT NULL и UNIQUE.
 """
 
+import os
+
 import sqlalchemy as sa
 from alembic import op
-
-from app.config import settings
 
 # revision identifiers, used by Alembic.
 revision = "0002_user_email"
 down_revision = "0001_initial"
 branch_labels = None
 depends_on = None
+
+# Прежние настройки админа из .env (сейчас их в настройках нет)
+OLD_ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin").strip().lower()
+OLD_ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "admin@example.com").strip().lower()
 
 
 def _has_email() -> bool:
@@ -36,10 +40,7 @@ def upgrade():
     bind = op.get_bind()
     bind.execute(
         sa.text("UPDATE users SET email = :email WHERE lower(username) = :username"),
-        {
-            "email": settings.admin_email.strip().lower(),
-            "username": settings.admin_username.strip().lower(),
-        },
+        {"email": OLD_ADMIN_EMAIL, "username": OLD_ADMIN_USERNAME},
     )
     bind.execute(
         sa.text("UPDATE users SET email = lower(username) || '@example.com' WHERE email IS NULL")

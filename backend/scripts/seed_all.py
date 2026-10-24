@@ -3,10 +3,10 @@
 from app.db import SessionLocal
 from app.logging_config import setup_logging
 
-from . import seed_admin, seed_demo
+from . import seed_superadmin, seed_demo
 
 SEEDS = [
-    seed_admin,  # администратор из .env — всегда первым
+    seed_superadmin,  # администратор из .env — всегда первым
     seed_demo,
     # сюда добавлять новые скрипты (модуль с функцией run(db))
 ]
