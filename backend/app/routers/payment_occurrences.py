@@ -18,7 +18,7 @@ from app.models.payment_occurrence import (
     STATUS_UNPAID,
 )
 from app.schemas.payments import Currency, OccurrenceOut, OccurrenceUpdate, Status
-from app.services.periods import ensure_all_occurrences, ensure_occurrences, remove_extra_unpaid
+from app.services.periods import ensure_all_occurrences, ensure_occurrences
 from app.services.serializers import occurrence_to_dict
 from app.timeutils import today
 
