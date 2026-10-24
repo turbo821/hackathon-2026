@@ -42,30 +42,18 @@ def _state_filter(state: str, on: date):
         return and_(O.status == STATUS_PAID, O.paid_at > O.due_date)
     return O.status == STATUS_UNPAID  # unpaid_all
 
-
-
-
-
-
 def _clean_occurrences(
-    db: Session, recurring_payment_id: int | None = None
+    db: Session,
+    recurring_payment_id: int | None = None,
+    protect_id: int | None = None,
 ) -> int:
-    """Удаляет из БД «лишние» периоды.
+    """Удаляет из БД «лишние» периоды (см. правило в исходной реализации).
 
-    Правило (для каждого `recurring_payment_id` отдельно, порядок — по
-    `due_date` по убыванию, т.е. сверху самый поздний период):
-
-      * если оплаченных нет — оставляем только самый ранний неоплаченный
-        (единственный «актуальный долг»), остальные удаляем;
-      * иначе P = оплаченный с максимальным `due_date`;
-      * U = неоплаченный с минимальным `due_date > P.due_date`
-        (ближайший следующий неоплаченный), если он существует;
-      * если U существует — удаляем все неоплаченные с
-        `due_date > U.due_date` (они стояли бы «перед» парой (U, P)).
-
-    Возвращает количество удалённых записей.
+    `protect_id` — ID периода, который удалять нельзя. Используется в
+    `update_occurrence`, чтобы клиент не получил 404, если чистка удалила
+    бы запись, которую он только что обновил. Инвариант «U, P сверху»
+    при этом восстанавливается при следующем чтении списка.
     """
-
     q = select(
         PaymentOccurrence.id,
         PaymentOccurrence.recurring_payment_id,
@@ -88,17 +76,18 @@ def _clean_occurrences(
 
     to_delete: list[int] = []
     for occs in by_payment.values():
-        # occs уже отсортированы по due_date desc
         paid = [o for o in occs if o.status == STATUS_PAID]
 
         if not paid:
-            # Ни одного оплаченного: оставляем только самый ранний неоплаченный
-            # (последний в desc-порядке).
             earliest = occs[-1]
-            to_delete.extend(o.id for o in occs if o.id != earliest.id)
+            to_delete.extend(
+                o.id
+                for o in occs
+                if o.id != earliest.id and o.id != protect_id
+            )
             continue
 
-        latest_paid = paid[0]  # самый поздний оплаченный
+        latest_paid = paid[0]
         unpaid_after = [
             o
             for o in occs
@@ -107,10 +96,11 @@ def _clean_occurrences(
         if not unpaid_after:
             continue
 
-        # ближайший следующий неоплаченный — последний в desc-списке
         first_unpaid = unpaid_after[-1]
         to_delete.extend(
-            o.id for o in unpaid_after if o.due_date > first_unpaid.due_date
+            o.id
+            for o in unpaid_after
+            if o.due_date > first_unpaid.due_date and o.id != protect_id
         )
 
     if to_delete:
@@ -252,6 +242,6 @@ def update_occurrence(
     payment = db.get(RecurringPayment, occ.recurring_payment_id)
     if payment is not None:
         ensure_occurrences(db, payment, on)
-    _clean_occurrences(db, occ.recurring_payment_id)  # <-- только затронутый шаблон
+    _clean_occurrences(db, occ.recurring_payment_id, protect_id=occurrence_id)  # <-- только затронутый шаблон
     db.commit()
     return occurrence_to_dict(_get_occurrence(db, occurrence_id), on)
