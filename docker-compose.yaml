@@ -7,11 +7,6 @@ services:
       - "5000:5000"
     volumes:
       - ./backend:/app
-      # База — в отдельном томе, а не в bind-mount: SQLite в режиме WAL
-      # не работает на bind-mount Docker Desktop поверх Windows
-      # (не создаётся -wal/-shm, новое соединение падает с
-      # «unable to open database file»). Том — обычная Linux-ФС, всё работает.
-      - backend_data:/app/instance
     restart: unless-stopped
 
   # Панель: статика, собранная Vite, раздаётся через nginx.
@@ -35,12 +30,6 @@ services:
     entrypoint: ["python", "-m", "app.worker"]
     volumes:
       - ./backend:/app
-      - backend_data:/app/instance
     depends_on:
       - backend
     restart: unless-stopped
-
-volumes:
-  # База данных. Живёт отдельно от кода — чтобы SQLite-файл был на
-  # нормальной ФС (см. комментарий у сервиса backend).
-  backend_data:

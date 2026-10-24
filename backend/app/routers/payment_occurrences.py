@@ -1,8 +1,9 @@
 from datetime import date
 from typing import Literal
+from collections import defaultdict
 
 from fastapi import APIRouter, Query
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import DB, CurrentUser
@@ -42,6 +43,83 @@ def _state_filter(state: str, on: date):
     return O.status == STATUS_UNPAID  # unpaid_all
 
 
+
+
+
+
+def _clean_occurrences(
+    db: Session, recurring_payment_id: int | None = None
+) -> int:
+    """Удаляет из БД «лишние» периоды.
+
+    Правило (для каждого `recurring_payment_id` отдельно, порядок — по
+    `due_date` по убыванию, т.е. сверху самый поздний период):
+
+      * если оплаченных нет — оставляем только самый ранний неоплаченный
+        (единственный «актуальный долг»), остальные удаляем;
+      * иначе P = оплаченный с максимальным `due_date`;
+      * U = неоплаченный с минимальным `due_date > P.due_date`
+        (ближайший следующий неоплаченный), если он существует;
+      * если U существует — удаляем все неоплаченные с
+        `due_date > U.due_date` (они стояли бы «перед» парой (U, P)).
+
+    Возвращает количество удалённых записей.
+    """
+
+    q = select(
+        PaymentOccurrence.id,
+        PaymentOccurrence.recurring_payment_id,
+        PaymentOccurrence.status,
+        PaymentOccurrence.due_date,
+    )
+    if recurring_payment_id is not None:
+        q = q.where(
+            PaymentOccurrence.recurring_payment_id == recurring_payment_id
+        )
+    q = q.order_by(
+        PaymentOccurrence.recurring_payment_id,
+        PaymentOccurrence.due_date.desc(),
+        PaymentOccurrence.id.desc(),
+    )
+
+    by_payment: dict[int, list] = defaultdict(list)
+    for row in db.execute(q).all():
+        by_payment[row.recurring_payment_id].append(row)
+
+    to_delete: list[int] = []
+    for occs in by_payment.values():
+        # occs уже отсортированы по due_date desc
+        paid = [o for o in occs if o.status == STATUS_PAID]
+
+        if not paid:
+            # Ни одного оплаченного: оставляем только самый ранний неоплаченный
+            # (последний в desc-порядке).
+            earliest = occs[-1]
+            to_delete.extend(o.id for o in occs if o.id != earliest.id)
+            continue
+
+        latest_paid = paid[0]  # самый поздний оплаченный
+        unpaid_after = [
+            o
+            for o in occs
+            if o.status == STATUS_UNPAID and o.due_date > latest_paid.due_date
+        ]
+        if not unpaid_after:
+            continue
+
+        # ближайший следующий неоплаченный — последний в desc-списке
+        first_unpaid = unpaid_after[-1]
+        to_delete.extend(
+            o.id for o in unpaid_after if o.due_date > first_unpaid.due_date
+        )
+
+    if to_delete:
+        db.execute(
+            delete(PaymentOccurrence).where(PaymentOccurrence.id.in_(to_delete))
+        )
+        db.flush()
+    return len(to_delete)
+
 def _get_occurrence(db: Session, occurrence_id: int) -> PaymentOccurrence:
     occ = db.get(
         PaymentOccurrence,
@@ -52,7 +130,6 @@ def _get_occurrence(db: Session, occurrence_id: int) -> PaymentOccurrence:
     if occ is None:
         raise ApiError(404, "Платёж не найден")
     return occ
-
 
 @router.get(
     "",
@@ -85,6 +162,7 @@ def list_occurrences(
     """
     on = today()
     ensure_all_occurrences(db, on)
+    _clean_occurrences(db)
 
     query = select(PaymentOccurrence).options(joinedload(PaymentOccurrence.marked_by))
     if state:
@@ -174,5 +252,6 @@ def update_occurrence(
     payment = db.get(RecurringPayment, occ.recurring_payment_id)
     if payment is not None:
         ensure_occurrences(db, payment, on)
+    _clean_occurrences(db, occ.recurring_payment_id)  # <-- только затронутый шаблон
     db.commit()
     return occurrence_to_dict(_get_occurrence(db, occurrence_id), on)
