@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     smtp_password: SecretStr = SecretStr("")
     smtp_name: str = "Invoice Keeper"
     smtp_subject: str = "Напоминание об оплате"
+    # SOCKS5-прокси для SMTP: socks5://host:port. Нужен там, где до почтового
+    # сервера не достучаться напрямую (например, провайдер режет исходящие
+    # SMTP-порты или закрыт IPv4).
+    smtp_proxy: str = ""
+    # STARTTLS вместо TLS на подключении: порт 587 вместо 465. У Mail.ru
+    # на 465 отказывает, а 587 работает.
+    smtp_starttls: bool = False
 
     # --- Тестовые данные ---
     # Скрипт scripts.seed_demo создаёт демо-платежи (аренда/сервер/подписка).
