@@ -205,6 +205,9 @@ cython_debug/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+# Локальный помощник для доступа к серверу по SSH (не в репозиторий)
+ssh_run.py
+
 # Ruff stuff:
 .ruff_cache/
 
