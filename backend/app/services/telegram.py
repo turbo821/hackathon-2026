@@ -42,26 +42,36 @@ def is_configured() -> bool:
 
 
 def _call(method: str, payload: dict | None = None, timeout: int = TIMEOUT) -> Any:
-    """Один вызов Bot API. Бросает TelegramError с описанием от Telegram.
-
-    Возвращает то, что прислал Telegram в поле result: для большинства
-    методов это dict, но getUpdates отдаёт список.
-    """
+    """Один вызов Bot API. Бросает TelegramError с описанием от Telegram."""
     if not has_token():
         raise TelegramNotConfigured("TELEGRAM_BOT_TOKEN не задан в .env")
 
+    # Читаем URL прокси из переменных окружения Docker
+    proxy_url = os.getenv("BOT_PROXY_URL")
+    
+    # Формируем базовые аргументы для запроса
+    request_kwargs = {
+        "json": payload or {},
+        "timeout": timeout,
+    }
+    
+    # Если прокси настроен, добавляем его в запрос
+    if proxy_url:
+        request_kwargs["proxies"] = proxy_url
+        # Опционально: можно раскомментировать для отладки, чтобы видеть в логах, что прокси применяется
+        # logger.debug(f"Запрос к Telegram через прокси: {proxy_url}")
+
     response = httpx.post(
         API_BASE.format(token=settings.telegram_bot_token, method=method),
-        json=payload or {},
-        timeout=timeout,
+        **request_kwargs,
     )
+    
     try:
         data = response.json()
     except ValueError:
         raise TelegramError(f"Telegram API {response.status_code}: ответ не JSON")
 
     if not data.get("ok"):
-        # Токен в лог не пишем: только код и описание ошибки
         raise TelegramError(
             f"Telegram API {response.status_code}: {data.get('description')}"
         )
