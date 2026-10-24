@@ -1,4 +1,10 @@
 {
+  "_comment": [
+    "Цепочка для исходящих запросов контейнеров: SOCKS5-инбаунд -> SOCKS5 WARP.",
+    "domain_strategy prefer_ipv4 обязателен: без него sing-box отдаёт апстриму",
+    "IPv6-адрес (api.telegram.org резолвится в 2001:...), а WARP-прокси такие",
+    "адреса не проксирует и отвечает socks5 code=4."
+  ],
   "log": {
     "level": "warn",
     "timestamp": true
@@ -16,7 +22,8 @@
       "type": "socks",
       "tag": "warp",
       "server": "127.0.0.1",
-      "server_port": 40000
+      "server_port": 40000,
+      "domain_strategy": "prefer_ipv4"
     }
   ]
 }
