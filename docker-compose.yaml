@@ -8,6 +8,11 @@ services:
   # доходит до WARP, который слушает только на loopback.
   # SOCKS5 слушает 172.17.0.1 (docker0), а не 0.0.0.0 — снаружи недоступен.
   #
+  # В proxy/sing-box.json у апстрима стоит domain_strategy: prefer_ipv4.
+  # Это обязательно: без него sing-box отдаёт WARP IPv6-адрес (api.telegram.org
+  # резолвится в 2001:...), а WARP-прокси такие адреса не проксирует и
+  # отвечает socks5 code=4.
+  #
   # Включается профилем: docker compose --profile proxy up -d
   # Без профиля сервисы работают как обычно (PROXY_URL пустой — прокси нет).
   proxy:
