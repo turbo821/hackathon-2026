@@ -3,7 +3,7 @@
 * {
     margin: 0;
     padding: 0;
-    box-sizing: border-box; 
+    box-sizing: border-box;
 }
 
 body {
@@ -16,7 +16,7 @@ body {
 }
 
 a {
-    text-decoration: none; 
+    text-decoration: none;
 }
 
 img {
@@ -160,6 +160,15 @@ img {
     background: #444;
 }
 
+.btn-sm {
+    padding: 8px 15px;
+    font-size: 13px;
+}
+
+.btn-danger:hover {
+    background: #7f1d1d;
+}
+
 .telegram {
     background: #0088CC;
     color: #fff;
@@ -201,10 +210,23 @@ img {
     color: #898989;
 }
 
-input[type=number]::-webkit-inner-spin-button, 
-input[type=number]::-webkit-outer-spin-button { 
-    -webkit-appearance: none; 
-    margin: 0; 
+.input-sm {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 13px;
+}
+
+.field-label {
+    display: block;
+    color: #898989;
+    font-size: 13px;
+    margin-bottom: 6px;
+}
+
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 input[type=number] {
     -moz-appearance: textfield;
@@ -310,6 +332,12 @@ input[type=number] {
     margin-top: 5px;
 }
 
+.summary-card p.summary-overdue {
+    color: #f87171;
+    font-size: 13px;
+    min-height: 1em;
+}
+
 .badge {
     display: inline-block;
     padding: 4px 10px;
@@ -323,6 +351,7 @@ input[type=number] {
 .badge.purple { background: #3b1b4d; }
 .badge.brown { background: #4d2e1b; }
 
+/* Стили для фильтров над таблицей */
 .filters-container {
     display: flex;
     gap: 10px;
@@ -353,6 +382,20 @@ input[type=number] {
     background: #FA8305;
     color: #fff;
     border-color: #FA8305;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #898989;
+    font-size: 14px;
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+
+.checkbox-label input {
+    accent-color: #FA8305;
 }
 
 .table-container {
@@ -389,6 +432,23 @@ table tr:last-child td {
     border-bottom: none;
 }
 
+table td.table-message {
+    text-align: center;
+    color: #898989;
+}
+
+.muted {
+    color: #898989;
+    font-size: 12px;
+}
+
+.row-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
 .status {
     display: inline-block;
     padding: 6px 14px;
@@ -397,23 +457,46 @@ table tr:last-child td {
     font-weight: 600;
 }
 
-.status-paid { 
-    background: rgba(74, 222, 128, 0.1); 
-    color: #4ade80; 
+.status-paid {
+    background: rgba(74, 222, 128, 0.1);
+    color: #4ade80;
 }
 
-.status-unpaid { 
-    background: rgba(250, 204, 21, 0.1); 
-    color: #facc15; 
+.status-late {
+    background: rgba(251, 146, 60, 0.12);
+    color: #fb923c;
 }
 
-.status-overdue { 
-    background: rgba(248, 113, 113, 0.1); 
-    color: #f87171; 
+.status-unpaid {
+    background: rgba(250, 204, 21, 0.1);
+    color: #facc15;
 }
+
+.status-overdue {
+    background: rgba(248, 113, 113, 0.1);
+    color: #f87171;
+}
+
+.status-ended {
+    background: rgba(137, 137, 137, 0.12);
+    color: #a3a3a3;
+}
+
+.role-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #2a221d;
+    color: #d4d4d4;
+}
+
+.role-badge.role-superadmin { background: rgba(250, 131, 5, 0.15); color: #FA8305; }
+.role-badge.role-admin { background: rgba(167, 139, 250, 0.15); color: #a78bfa; }
 
 .modal-overlay {
-    display: flex; 
+    display: flex;
     position: fixed;
     top: 0;
     left: 0;
@@ -508,17 +591,18 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
         gap: 20px;
         padding: 20px 0;
     }
-    
+
     #main-nav {
         margin-left: 0;
         width: 100%;
         justify-content: space-between;
+        flex-wrap: wrap;
     }
-    
+
     #main-nav ul {
         gap: 15px;
     }
-    
+
     .nav-right {
         margin-left: 0;
         margin-top: 10px;
@@ -529,13 +613,13 @@ input[type="date"]::-webkit-calendar-picker-indicator:hover {
     .summary-cards {
         flex-direction: column;
     }
-    
+
     .dashboard-header {
         flex-direction: column;
         gap: 15px;
         align-items: flex-start;
     }
-    
+
     .modal-content {
         padding: 20px;
         margin: 20px;
