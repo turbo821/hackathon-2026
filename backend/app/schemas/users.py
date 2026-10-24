@@ -6,7 +6,7 @@ from pydantic import Field, field_validator
 from app.schemas.common import Schema, UtcDateTime
 
 USERNAME_RE = re.compile(r"^[A-Za-z0-9_.\-]{3,64}$")
-
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 def _check_username(value: str) -> str:
     value = value.strip()
@@ -14,6 +14,13 @@ def _check_username(value: str) -> str:
         raise ValueError("Логин: 3–64 символа, латиница, цифры, точка, дефис, подчёркивание")
     return value
 
+def _check_email(value: str) -> str:
+    value = value.strip().lower()
+    if not value:
+        return None  # пустая строка = «без email»
+    if len(value) > 255 or not EMAIL_RE.match(value):
+        raise ValueError("Некорректный email, пример: ivan@example.com")
+    return value
 
 def _check_password(value: str) -> str:
     if not 6 <= len(value) <= 72:
@@ -24,6 +31,7 @@ def _check_password(value: str) -> str:
 class UserOut(Schema):
     id: int
     username: str
+    email: str
     role: Literal["admin", "user"] = Field(description="Админ - из .env, нельзя изменить через панель")
     created_at: UtcDateTime
 
@@ -31,6 +39,7 @@ class UserOut(Schema):
 class UserCreate(Schema):
     username: str = Field(examples=["ivan"])
     password: str = Field(examples=["secret123"])
+    email: str = Field(examples=["ivan@example.com"])
 
     @field_validator("username")
     @classmethod

@@ -23,7 +23,10 @@ from app.timeutils import today
 
 logger = get_logger(__name__)
 
-DEMO_USERS = [("user", "user12345"), ("anna", "anna12345")]
+DEMO_USERS = [
+    ("user", "user12345", "user@example.com"),
+    ("anna", "anna12345", "anna@example.com"),
+]
 
 
 def run(db: Session):
@@ -31,10 +34,10 @@ def run(db: Session):
         logger.info("demo: SEED_DEMO_DATA=false, пропускаю")
         return
 
-    for username, password in DEMO_USERS:
+    for username, password, email in DEMO_USERS:
         if not db.scalars(select(User).where(User.username == username)).first():
-            db.add(User(username=username, password_hash=hash_password(password)))
-            logger.info(f"demo: создан пользователь {username} / {password}")
+            db.add(User(username=username, email=email, password_hash=hash_password(password)))
+            logger.info(f"demo: создан пользователь {username} / {password} ({email})")
     db.commit()
 
     if db.scalar(select(func.count()).select_from(RecurringPayment)) > 0:
