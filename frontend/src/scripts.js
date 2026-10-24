@@ -46,9 +46,17 @@ function logout(e) {
 
 
 function showDashboard() {
-    document.getElementById('login-screen').classList.add('hidden'); // Прячем логин
-    document.getElementById('dashboard-screen').classList.remove('hidden'); // Показываем дашборд
-    document.getElementById('logout-btn').classList.remove('hidden'); // Показываем кнопку выйти
+    document.getElementById('login-screen').classList.add('hidden'); 
+    document.getElementById('dashboard-screen').classList.remove('hidden'); 
+    
+
+    document.getElementById('main-nav').classList.remove('hidden');
+    document.getElementById('logout-btn').classList.remove('hidden');
+    
+
+    const roleSpan = document.getElementById('user-role');
+    roleSpan.innerText = myRole === 'admin' ? 'admin' : 'user';
+    roleSpan.classList.remove('hidden');
 
 
     if (myRole === 'admin') {
@@ -57,7 +65,7 @@ function showDashboard() {
         document.getElementById('add-payment-btn').classList.add('hidden');
     }
 
-    loadPayments(); // Загружаем данные
+    loadPayments(); 
 }
 
 async function loadPayments() {

@@ -342,7 +342,80 @@ table tr:last-child td {
     padding: 12px;
     font-size: 16px;
 }
+/* Настройка шапки */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+}
 
+/* Настройка самой навигации (она займет все место справа от логотипа) */
+#main-nav {
+    display: flex;
+    align-items: center;
+    flex: 1; /* Занимает всё доступное пространство */
+    margin-left: 50px; /* Отступ от логотипа */
+}
+
+/* Список вкладок */
+#main-nav ul {
+    display: flex;
+    list-style: none;
+    gap: 30px;
+    margin: 0;
+    padding: 0;
+}
+
+/* Кнопки вкладок */
+.nav-link {
+    color: #ccc;
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    padding-bottom: 5px;
+    transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+    color: #fff;
+}
+
+/* Активная вкладка (подчеркивание) */
+.nav-link.active {
+    color: #fff;
+    border-bottom: 2px solid #4a7dff; /* Синий цвет как на твоем фото */
+}
+
+/* Правая часть (Роль + Выйти) */
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto; /* ВОТ ЭТА МАГИЯ ПРИЖИМАЕТ БЛОК ВПРАВО */
+}
+
+/* Стили для текста роли */
+#user-role {
+    color: #ccc;
+    font-size: 14px;
+    background: #222; /* Легкий фон для плашки */
+    padding: 4px 10px;
+    border-radius: 5px;
+}
+
+/* Кнопка Выйти */
+#logout-btn {
+    color: #ff4d4d; 
+    text-decoration: none;
+    font-size: 15px;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+#logout-btn:hover {
+    color: #ff1a1a;
+}
 @media (max-width: 768px) {
     .header {
         flex-direction: column;
