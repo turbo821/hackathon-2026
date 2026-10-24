@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from app.schemas.common import Money, Schema, UtcDateTime
+from app.schemas.common import MoneyIn, MoneyOut, Schema, UtcDateTime
 from app.timeutils import today
 
 Currency = Literal["RUB", "USD", "EUR"]
@@ -16,7 +16,7 @@ State = Literal["pending", "overdue", "paid", "paid_late"]
 
 class RecurringPaymentCreate(Schema):
     name: str = Field(examples=["Аренда офиса"])
-    amount: Money
+    amount: MoneyIn
     currency: Currency = Field(examples=["RUB"])
     first_due_date: date = Field(description="Дата ближайшей оплаты (YYYY-MM-DD)", examples=["2026-10-25"])
     period: Period = Field("monthly", description="Периодичность: monthly (по умолчанию), quarterly, yearly")
@@ -35,7 +35,7 @@ class RecurringPaymentCreate(Schema):
 class RecurringPaymentOut(Schema):
     id: int
     name: str
-    amount: Money
+    amount: MoneyOut
     currency: Currency
     period: Period
     first_due_date: date
@@ -52,7 +52,7 @@ class OccurrenceOut(Schema):
     id: int
     recurring_payment_id: int
     name: str
-    amount: Money
+    amount: MoneyOut
     currency: Currency
     due_date: date = Field(description="Срок оплаты этого периода")
     status: Status
@@ -95,10 +95,10 @@ class OccurrenceUpdate(Schema):
 
 class CurrencyTotals(Schema):
     currency: Currency
-    total: Money
-    paid: Money
-    unpaid: Money
-    overdue: Money
+    total: MoneyOut
+    paid: MoneyOut
+    unpaid: MoneyOut
+    overdue: MoneyOut
     count_total: int
     count_paid: int
     count_unpaid: int

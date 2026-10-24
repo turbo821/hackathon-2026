@@ -112,5 +112,9 @@ def _create_occurrence(db: Session, rp: RecurringPayment, due: date) -> PaymentO
 
 def ensure_all_occurrences(db: Session, on: date | None = None) -> int:
     """Досоздаёт периоды для всех активных платежей. Возвращает число новых."""
-    # TODO(каркас → реализация): обойти активные платежи и вызвать ensure_occurrences.
-    return 0
+    total = 0
+    for rp in db.scalars(select(RecurringPayment).where(RecurringPayment.is_active.is_(True))):
+        total += len(ensure_occurrences(db, rp, on))
+    if total:
+        db.commit()
+    return total

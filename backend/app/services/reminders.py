@@ -1,32 +1,34 @@
-"""Напоминания об оплате в Telegram — ЗАГЛУШКА этапа «каркас».
+"""Напоминания об оплате в Telegram.
 
-Форматирование текста уже готово (его видно в Swagger/логах), а сама отправка
-и выборка периодов — следующий этап.
-
-Что здесь должно быть (правила из кейса):
-
+Правила из кейса:
 - минимум за REMINDER_DAYS_BEFORE (3) дня до срока;
-- только неоплаченные периоды активных платежей;
+- только неоплаченные периоды действующих платежей;
 - без дублей: период «захватывается» атомарным UPDATE ... WHERE reminder_sent_at IS NULL,
   поэтому повторная проверка или параллельный процесс второй раз не отправят;
-- добавили платёж позже, чем за 3 дня до срока → напоминание сразу (remind_for_payment);
-- оплаченный период напоминания не вызывает;
-- удалённый (неактивный) платёж больше не создаёт напоминаний.
+- добавили платёж позже, чем за 3 дня до срока → напоминание сразу (remind_for_payment).
 
-Пока реализация не готова, функции ничего не отправляют и возвращают 0.
+Период хранит слепок полей платежа, поэтому выборка идёт по одной таблице.
 """
 
 import html
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.logging_config import get_logger
 from app.models import PaymentOccurrence, RecurringPayment
+from app.models.payment_occurrence import STATUS_UNPAID
+from app.services import telegram
+from app.services.periods import ensure_all_occurrences
+from app.timeutils import today, utcnow
 
 logger = get_logger(__name__)
+
+# Флаг, чтобы не сыпать предупреждения каждую минуту, пока бот не настроен
+_warned_not_configured = False
 
 
 def format_amount(amount: Decimal, currency: str) -> str:
@@ -61,17 +63,85 @@ def build_message(occ: PaymentOccurrence, on: date) -> str:
     )
 
 
+def _due_occurrences_query(on: date):
+    """Неоплаченные периоды действующих платежей со сроком в окне [сегодня; сегодня + N]."""
+    window_end = on + timedelta(days=settings.reminder_days_before)
+    return (
+        select(PaymentOccurrence)
+        .where(
+            PaymentOccurrence.payment_ended_at.is_(None),   # платёж не прекращён
+            PaymentOccurrence.status == STATUS_UNPAID,      # ещё не оплачено
+            PaymentOccurrence.reminder_sent_at.is_(None),   # ещё не напоминали
+            PaymentOccurrence.due_date >= on,
+            PaymentOccurrence.due_date <= window_end,
+        )
+        .order_by(PaymentOccurrence.due_date)
+    )
+
+
+def _claim(db: Session, occ_id: int) -> bool:
+    """Атомарно помечает период как «напоминание отправляется». True — захватили мы."""
+    result = db.execute(
+        update(PaymentOccurrence)
+        .where(PaymentOccurrence.id == occ_id, PaymentOccurrence.reminder_sent_at.is_(None))
+        .values(reminder_sent_at=utcnow())
+    )
+    db.commit()
+    return result.rowcount == 1
+
+
+def _release(db: Session, occ_id: int) -> None:
+    """Отправка не удалась — снимаем отметку, чтобы попробовать в следующий раз."""
+    db.execute(
+        update(PaymentOccurrence)
+        .where(PaymentOccurrence.id == occ_id)
+        .values(reminder_sent_at=None)
+    )
+    db.commit()
+
+
+def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> int:
+    global _warned_not_configured
+    if not occurrences:
+        return 0
+    if not telegram.is_configured():
+        if not _warned_not_configured:
+            logger.warning(
+                "Telegram не настроен (TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID) — "
+                "напоминания не отправляются"
+            )
+            _warned_not_configured = True
+        return 0
+
+    sent = 0
+    for occ in occurrences:
+        # Текст собираем заранее, до захвата: не зависим от состояния объекта после commit
+        text = build_message(occ, on)
+        occ_id, name, due = occ.id, occ.name, occ.due_date
+        if not _claim(db, occ_id):
+            logger.info(f"Напоминание по периоду #{occ_id} уже отправлено, пропускаю")
+            continue
+        try:
+            telegram.send_message(text)
+            sent += 1
+            logger.info(f"Напоминание отправлено: «{name}», срок {due} (период #{occ_id})")
+        except Exception:
+            logger.exception(f"Не удалось отправить напоминание по периоду #{occ_id}")
+            _release(db, occ_id)
+    return sent
+
+
 def check_and_send(db: Session, on: date | None = None) -> int:
-    """Полная проверка (вызывается worker'ом по расписанию). Возвращает число отправок."""
-    # TODO(каркас → реализация): выбрать неоплаченные периоды в окне
-    # [сегодня; сегодня + REMINDER_DAYS_BEFORE] и отправить по ним напоминания.
-    logger.debug("reminders.check_and_send: заглушка, напоминания не отправляются")
-    return 0
+    """Полная проверка (вызывается worker'ом по расписанию)."""
+    on = on or today()
+    # Периоды, которых ещё нет, досоздаём здесь: платёж могли добавить после
+    # последнего открытия панели — без этого worker его бы не увидел.
+    ensure_all_occurrences(db, on)
+    return _send_for(db, list(db.scalars(_due_occurrences_query(on)).all()), on)
 
 
 def remind_for_payment(db: Session, rp: RecurringPayment, on: date | None = None) -> int:
     """Немедленная проверка одного платежа — сразу после его создания."""
-    # TODO(каркас → реализация): если срок ближе, чем через REMINDER_DAYS_BEFORE дней, —
-    # отправить напоминание сразу при создании платежа.
-    logger.debug(f"reminders.remind_for_payment: заглушка, платёж #{getattr(rp, 'id', None)}")
-    return 0
+    on = on or today()
+    query = _due_occurrences_query(on).where(PaymentOccurrence.recurring_payment_id == rp.id)
+    return _send_for(db, list(db.scalars(query).all()), on)

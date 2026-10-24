@@ -1,14 +1,11 @@
-"""Отправка сообщений в Telegram через Bot API — ЗАГЛУШКА этапа «каркас».
+"""Отправка сообщений в Telegram через Bot API.
 
-Проверка настройки (is_configured) уже рабочая: она нужна, чтобы health-check
-и worker понимали, настроен ли бот. Сама отправка — следующий этап.
+Кейсу нужен только исходящий поток: бот сам проверяет сроки и пишет в указанный
+чат. Обработка команд не требуется, поэтому ходим прямо в Bot API — без aiogram.
 
-Что здесь должно быть (правила из кейса):
-
-- минимум за REMINDER_DAYS_BEFORE (3) дня до срока;
-- только неоплаченные периоды активных платежей;
-- без дублей: период «захватывается» атомарным UPDATE ... WHERE reminder_sent_at IS NULL;
-- добавили платёж позже, чем за 3 дня до срока → напоминание сразу.
+Настройка (.env):
+    TELEGRAM_BOT_TOKEN=123456:ABC-DEF...   токен от @BotFather
+    TELEGRAM_CHAT_ID=-1001234567890        куда писать
 """
 
 import httpx
@@ -18,11 +15,11 @@ from app.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-API_URL = "https://api.telegram.org/bot8662224659:AAFuQiKUkXmoAK91S4Foz93KKs0fjkMTwzk/sendMessage"
+API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
 
 class TelegramNotConfigured(RuntimeError):
-    pass
+    """В .env нет токена или chat_id."""
 
 
 def is_configured() -> bool:
@@ -31,13 +28,27 @@ def is_configured() -> bool:
 
 
 def send_message(text: str, chat_id: str | None = None) -> dict:
-    """Отправляет HTML-сообщение в чат. Бросает исключение при ошибке."""
-    # TODO(каркас → реализация): POST на Bot API, разобрать ответ, не писать токен в лог.
+    """Отправляет HTML-сообщение в чат. Бросает исключение при ошибке.
+
+    chat_id можно передать явно — иначе берётся из .env.
+    """
     if not is_configured():
-        raise TelegramNotConfigured(
-            "TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID не заданы в .env"
-        )
-    raise NotImplementedError(
-        "Отправка в Telegram ещё не реализована — это этап «каркас». "
-        "Реализация: POST api.telegram.org/bot<token>/sendMessage, parse_mode=HTML."
+        raise TelegramNotConfigured("TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID не заданы в .env")
+
+    response = httpx.post(
+        API_URL.format(token=settings.telegram_bot_token),
+        json={
+            "chat_id": chat_id or settings.telegram_chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        },
+        timeout=10,
     )
+
+    data = response.json() if response.content else {}
+    if not data.get("ok"):
+        # Токен в лог не пишем: только код и описание ошибки от Telegram
+        raise RuntimeError(f"Telegram API {response.status_code}: {data.get('description')}")
+    logger.info(f"Сообщение отправлено в чат {chat_id or settings.telegram_chat_id}")
+    return data

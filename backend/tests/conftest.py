@@ -6,6 +6,9 @@ import pytest
 os.environ["JWT_SECRET_KEY"] = "test-secret-key-that-is-long-enough-123"
 os.environ["ADMIN_USERNAME"] = "admin"
 os.environ["ADMIN_PASSWORD"] = "admin-pass"
+# Telegram должен быть «настроен», иначе send_message не вызывается вовсе
+os.environ["TELEGRAM_BOT_TOKEN"] = "test-token"
+os.environ["TELEGRAM_CHAT_ID"] = "-100123"
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402

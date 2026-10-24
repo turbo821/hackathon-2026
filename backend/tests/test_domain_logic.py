@@ -1,23 +1,20 @@
-"""Сценарии, которым нужна доменная логика: генерация периодов и напоминания.
+"""Сценарии из критериев приёмки, которым нужна доменная логика:
+генерация периодов, статусы и просрочка, напоминания в Telegram.
 
-Они описаны в кейсе, но на этапе «каркас» app/services/periods.py и
-app/services/reminders.py — заглушки, поэтому весь файл пропускается.
-Когда заглушки заменятся реализацией, снимите пометку skip
-(или удалите её вместе с pytestmark) — тесты станут активными.
+Отправка в Telegram здесь подменена (фикстура `sent`), реальных сообщений
+тесты не шлют.
 """
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 
 from app import timeutils
+from app.models import RecurringPayment
 from app.services import telegram
 from app.services.reminders import check_and_send
 from tests.conftest import login
-
-pytestmark = pytest.mark.skip(
-    reason="доменная логика периодов/напоминаний ещё не реализована (этап «каркас»)"
-)
 
 API = "/api/v1"
 
@@ -137,6 +134,19 @@ def test_reminder_sent_immediately_when_added_late(client, admin, sent):
     create_payment(client, admin, name="Сервер", amount="20", currency="USD", first_due_date="2026-10-25")
     assert len(sent) == 1
     assert "Сервер" in sent[0] and "20.00 USD" in sent[0] and "25.10.2026" in sent[0]
+
+
+def test_worker_creates_missing_periods(client, admin, sent, db):
+    """Платёж, созданный мимо API, worker тоже должен увидеть: периоды досоздаются."""
+    db.add(
+        RecurringPayment(
+            name="Сервер", amount=Decimal("49.90"), currency="USD", period="monthly",
+            first_due_date=date(2026, 10, 25), anchor_day=25,
+        )
+    )
+    db.commit()
+    assert check_and_send(db) == 1
+    assert len(sent) == 1 and "Сервер" in sent[0]
 
 
 def test_reminder_window_and_no_duplicates(client, admin, sent, db):

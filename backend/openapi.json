@@ -1201,10 +1201,17 @@
             ]
           },
           "amount": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
             "title": "Amount",
-            "description": "Сумма, до 2 знаков после запятой",
-            "example": "50000.00"
+            "decimal_places": 2,
+            "max_digits": 14
           },
           "currency": {
             "type": "string",

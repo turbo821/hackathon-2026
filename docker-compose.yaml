@@ -20,3 +20,16 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+
+  # Фоновые напоминания в Telegram.
+  # entrypoint переопределён: миграции и сиды выполняет сервис backend,
+  # иначе два процесса будут одновременно менять одну SQLite-базу.
+  worker:
+    build: ./backend
+    env_file: .env
+    entrypoint: ["python", "-m", "app.worker"]
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -7,7 +7,7 @@ from typing import Annotated
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, PlainSerializer, WithJsonSchema
 
 
-def _money(value) -> Decimal:
+def _money_in(value) -> Decimal:
     """Принимаем число или строку ("1500", "1 500,50") — на вход."""
     if value is None:
         raise ValueError("Сумма обязательна")
@@ -20,10 +20,17 @@ def _money(value) -> Decimal:
     return amount
 
 
-# Деньги — только Decimal, никакого float. Наружу отдаём строкой "1500.50".
-Money = Annotated[
+# Вход: платёж нулём не бывает — сумма обязательна и больше нуля.
+MoneyIn = Annotated[
     Decimal,
-    BeforeValidator(_money),
+    BeforeValidator(_money_in),
+    Field(max_digits=14, decimal_places=2),
+]
+
+# Выход: в ответе сумма — любое неотрицательное число (в итогах бывает 0.00),
+# поэтому проверку «больше нуля» применяем только ко входным данным.
+MoneyOut = Annotated[
+    Decimal,
     Field(max_digits=14, decimal_places=2),
     PlainSerializer(lambda v: f"{Decimal(v):.2f}", return_type=str),
     WithJsonSchema({"type": "string", "example": "50000.00", "description": "Сумма, до 2 знаков после запятой"}),
