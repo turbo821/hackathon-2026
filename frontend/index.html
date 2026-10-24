@@ -92,7 +92,7 @@
             <div class="container dashboard-container hidden" id="tab-regular">
                 <div class="dashboard-header">
                     <h2>Регулярные платежи</h2>
-                    <button id="add-payment-btn" class="btn hidden" onclick="openModal()">+ Добавить платеж</button>
+                    <button id="add-payment-btn" class="btn hidden" onclick="openModalRegular()">+ Добавить платеж</button>
                 </div>
                 <p style="color: #ccc; margin-top: 20px;">Здесь будет список шаблонов регулярных платежей.</p>
             </div>
@@ -108,10 +108,46 @@
         </div>
     </div>
 
+    <!-- МОДАЛКА ДЛЯ СОЗДАНИЯ РЕГУЛЯРНОГО ПЛАТЕЖА -->
+    <div id="modal-regular" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3>Новый регулярный платеж</h3>
+            
+            <div class="form-group">
+                <input type="text" id="reg-name" placeholder="Название (Аренда офиса)" class="input-field">
+            </div>
+            <div class="form-group">
+                <input type="number" id="reg-amount" placeholder="Сумма" class="input-field">
+            </div>
+            <div class="form-group">
+                <select id="reg-currency" class="input-field">
+                    <option value="RUB">RUB</option>
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <input type="date" id="reg-date" placeholder="Дата ближайшей оплаты" class="input-field">
+            </div>
+            <div class="form-group">
+                <select id="reg-period" class="input-field">
+                    <option value="monthly">Ежемесячно</option>
+                    <option value="weekly">Еженедельно</option>
+                    <option value="yearly">Ежегодно</option>
+                </select>
+            </div>
+            
+            <div class="modal-actions">
+                <button class="btn" onclick="createRegularPayment()">Сохранить</button>
+                <button class="btn btn-secondary" onclick="closeModalRegular()">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ОСТАЛЬНЫЕ МОДАЛКИ -->
     <div id="modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3>Новый платеж</h3>
-            
             <div class="form-group">
                 <input type="text" id="new-name" placeholder="Название (Аренда)" class="input-field">
             </div>
@@ -139,7 +175,6 @@
     <div id="modal-user" class="modal-overlay hidden">
         <div class="modal-content">
             <h3>Новый пользователь</h3>
-
             <div class="form-group">
                 <input type="text" id="new-user-name" placeholder="ФИО" class="input-field">
             </div>

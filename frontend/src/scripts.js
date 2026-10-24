@@ -32,8 +32,6 @@ async function handleLogin() {
         myRole = 'owner';
         localStorage.setItem('token', 'fake-token-owner');
         showDashboard();
-    } else if (email === '' || password === '') {
-        document.getElementById('login-error').classList.remove('hidden');
     } else {
         document.getElementById('login-error').classList.remove('hidden');
     }
@@ -58,7 +56,6 @@ function showDashboard() {
     const addPaymentBtn = document.getElementById('add-payment-btn');
     const addUserBtn = document.getElementById('add-user-btn');
 
-    // ЛОГИКА ПРАВ: Админ ИЛИ Овнер видят кнопки
     if (myRole === 'admin' || myRole === 'owner') {
         if (addPaymentBtn) addPaymentBtn.classList.remove('hidden');
         if (addUserBtn) addUserBtn.classList.remove('hidden');
@@ -156,39 +153,47 @@ function markUnpaid(id) {
     alert(`Отправляем PATCH запрос: отменить оплату для платежа ${id}`);
 }
 
-function openModal() {
-    document.getElementById('modal').classList.remove('hidden');
+// --- РЕГУЛЯРНЫЕ ПЛАТЕЖИ ---
+function openModalRegular() {
+    document.getElementById('modal-regular').classList.remove('hidden');
 }
 
-function closeModal() {
-    document.getElementById('modal').classList.add('hidden');
-    document.getElementById('new-name').value = '';
-    document.getElementById('new-amount').value = '';
-    document.getElementById('new-date').value = '';
+function closeModalRegular() {
+    document.getElementById('modal-regular').classList.add('hidden');
+    document.getElementById('reg-name').value = '';
+    document.getElementById('reg-amount').value = '';
+    document.getElementById('reg-date').value = '';
+    document.getElementById('reg-period').value = 'monthly';
 }
 
-function createPayment() {
-    const name = document.getElementById('new-name').value;
-    const amount = document.getElementById('new-amount').value;
-    const currency = document.getElementById('new-currency').value;
-    const date = document.getElementById('new-date').value;
+function createRegularPayment() {
+    const name = document.getElementById('reg-name').value;
+    const amount = document.getElementById('reg-amount').value;
+    const currency = document.getElementById('reg-currency').value;
+    const date = document.getElementById('reg-date').value;
+    const period = document.getElementById('reg-period').value;
 
     if (!name || !amount || !date) {
         showToast('Пожалуйста, заполните все поля!', 'error');
         return;
     }
 
-    const newPayment = {
+    const newRegPayment = {
         name: name,
         amount: Number(amount),
         currency: currency,
-        date: date
+        date: date,
+        period: period
     };
 
-    showToast('Платеж добавлен');
-    closeModal();
+    // Здесь потом будет fetch POST запрос к /recurring-payments
+    console.log('Создан регулярный платеж:', newRegPayment);
+
+    showToast('Шаблон регулярного платежа создан!');
+    closeModalRegular();
 }
 
+// --- ПОЛЬЗОВАТЕЛИ ---
 function openModal1() {
     document.getElementById('modal-user').classList.remove('hidden');
 }
@@ -212,7 +217,6 @@ function createUser() {
         return;
     }
 
-    // Логика проверки: Овнер может создавать админов, а админ - нет
     if (role === 'admin' && myRole !== 'owner') {
         showToast('Только Владелец может создавать администраторов!', 'error');
         return;
