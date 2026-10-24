@@ -1,12 +1,17 @@
-from app.extensions import db
+from datetime import datetime
+
+from sqlalchemy import DateTime, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db import Base
 from app.timeutils import utcnow
 
 
-class RevokedToken(db.Model):
+class RevokedToken(Base):
     """Отозванные JWT (logout). Храним jti до истечения срока токена."""
 
     __tablename__ = "revoked_tokens"
 
-    jti = db.Column(db.String(64), primary_key=True)
-    expires_at = db.Column(db.DateTime, nullable=False, index=True)
-    revoked_at = db.Column(db.DateTime, nullable=False, default=utcnow)
+    jti: Mapped[str] = mapped_column(String(64), primary_key=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

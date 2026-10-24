@@ -1,72 +1,121 @@
-# Проект для хакатона
+# Invoice Keeper — напоминания о регулярных платежах
+
+Веб-панель + Telegram-напоминания о регулярных платежах: администратор заводит
+платежи, система напоминает в чат за 3 дня до срока, пользователи отмечают оплату
+и видят просрочки.
 
 ## Стек
 
 | Слой | Технологии |
 |------|-----------|
+| Backend | Python 3.12, FastAPI, Uvicorn, SQLAlchemy 2.0, Alembic, Pydantic v2 |
+| База | SQLite (файл `backend/instance/app.db`) |
 | Frontend | JavaScript (без фреймворка), Vite, Tailwind CSS, Axios |
-| Backend | Python, Flask, SQLAlchemy, Flask-Migrate |
-| БД | SQLite (файл `backend/instance/app.db`) |
 | Инфраструктура | Docker, docker-compose |
+
+## Что уже работает (этап «каркас»)
+
+- Авторизация по JWT, две роли: администратор и пользователь.
+- Роли проверяются **на сервере**: обычный пользователь не выполнит действие
+  администратора даже через API.
+- Все обязательные эндпоинты кейса, Swagger (`/api/v1/docs`) и OpenAPI-спецификация.
+- Схема БД (4 таблицы) и одна миграция Alembic.
+- Единый формат ошибок, тесты на роли, доступ и контракт.
+
+Реализовано в `app/services/` и `app/worker.py`:
+
+| Модуль | Что делает |
+|--------|------------|
+| `services/periods.py` | генерирует периоды платежа: своя дата и своя отметка «Оплачено / Не оплачено» |
+| `services/reminders.py` | выбирает неоплаченные периоды в окне 3 дней и отправляет напоминания без дублей |
+| `services/telegram.py` | отправляет сообщения в Telegram Bot API |
+| `worker.py` | фоновый процесс: проверяет сроки по расписанию (`REMINDER_CHECK_INTERVAL_SECONDS`) |
+
+Сценарии приёмки на эту логику — в `backend/tests/test_domain_logic.py`; они помечены
+`skip` и разблокируются снятием пометки, когда логика будет проверена вручную.
+
+### Схема данных
+
+Четыре таблицы: `users`, `recurring_payments` (шаблоны), `payment_occurrences`
+(периоды), `revoked_tokens` (завершённые сессии).
+
+Роль в базе **не хранится**: администратор — это аккаунт, чей логин совпадает с
+`ADMIN_USERNAME` из `.env`. Значит база не может разойтись с настройкой, а роль
+в API (`role: "admin" | "user"`) считается на лету.
+
+Период — **слепок** шаблона: при создании он копирует `name`, `amount`, `currency`
+и хранит `payment_ended_at` (когда платёж прекратили). Поэтому любой список
+периодов читается по одной таблице, без JOIN, и все фильтры (`state`, `status`,
+`currency`, `recurring_payment_id`, даты) работают по ней же. Шаблон нельзя
+изменить через API — есть только создать и прекратить, — так что слепок не
+расходится с оригиналом.
+
+Просрочка и статус периода **не хранятся**, а считаются при чтении: так
+исправление фактической даты оплаты сразу убирает ошибочную просрочку, а срок
+не меняется.
+
+### Что убрали и почему
+
+Каркас — это минимум, который нужен для работы приложения. Необязательное убрано:
+
+| Убрали | Почему |
+|--------|--------|
+| Журнал действий (`audit_logs`) | Бонусная фича из кейса, а не обязательное условие приёмки |
+| Отдельный процесс `worker` | Пока напоминания не реализованы, процессу нечего делать; добавляется вместе с ними |
+| Файловые логи с ротацией | Хватает stdout (`docker compose logs`) |
+| Разбор ошибок pydantic по полям | Осталось первое сообщение об ошибке — фронту этого достаточно |
+| `GET /recurring-payments/{id}`, `GET /users/{id}` | Их нет в списке эндпоинтов кейса |
 
 ## Структура проекта
 
 ```
 project/
-├── docker-compose.yml
+├── docker-compose.yaml
 ├── .env.example
 ├── .env                    # не коммитить
-├── .gitignore
 ├── README.md
 ├── backend/
 │   ├── Dockerfile
+│   ├── entrypoint.sh       # миграции + сиды при старте контейнера
+│   ├── alembic.ini
+│   ├── main.py             # точка входа: uvicorn main:app
 │   ├── requirements.txt
-│   ├── main.py             # точка входа
-│   ├── migrations/         # создаётся командой db init, коммитим в git
-│   ├── instance/           # здесь лежит app.db, не коммитить
-│   ├── scripts/            # скрипты для данных
-│   │   ├── __init__.py
-│   │   ├── seed_messages.py
-│   │   └── seed_all.py
+│   ├── openapi.json        # спецификация из репозитория (перегенерируется скриптом)
+│   ├── migrations/         # миграции Alembic (коммитим в git)
+│   ├── instance/           # здесь app.db, не коммитить
+│   ├── scripts/            # сиды, проверка схемы, выгрузка спецификации
+│   │   ├── seed_admin.py
+│   │   ├── seed_demo.py
+│   │   ├── seed_all.py
+│   │   ├── check_schema.py
+│   │   ├── reset_db.py
+│   │   └── export_openapi.py
+│   ├── tests/
 │   └── app/
-│       ├── __init__.py     # create_app()
-│       ├── config.py
-│       ├── extensions.py   # db, migrate, cors
+│       ├── main.py         # create_app(): сборка приложения
+│       ├── config.py       # настройки из .env
+│       ├── db.py           # engine, сессии, Base
+│       ├── auth.py         # JWT, пароли, зависимости ролей
+│       ├── errors.py       # единый формат ошибок
+│       ├── logging_config.py
+│       ├── timeutils.py    # «сегодня» в часовом поясе приложения
 │       ├── models/         # SQLAlchemy-модели
-│       │   ├── __init__.py
-│       │   └── message.py
-│       └── routes/         # Flask Blueprints
-│           ├── __init__.py
-│           ├── health.py
-│           └── hello.py
+│       ├── schemas/        # Pydantic-схемы запросов и ответов
+│       ├── routers/        # эндпоинты API
+│       ├── services/       # доменная логика (сейчас — заглушки)
+│       └── (worker.py)     # процесс напоминаний — добавится вместе с ними
 └── frontend/
     ├── Dockerfile
     ├── index.html
     ├── package.json
     ├── vite.config.js
     └── src/
-        ├── api/            # axios-клиент и функции запросов
-        │   └── client.js
-        ├── components/     # функции, возвращающие DOM-элементы
-        │   └── Button.js
-        ├── pages/          # функции renderXxx(root)
-        │   └── home.js
+        ├── api/client.js   # axios-клиент
+        ├── components/
+        ├── pages/
         ├── main.js
         └── index.css
 ```
-
-Фронт и бек живут независимо, а в корне лежит всё, что связывает их вместе.
-
-## Как работает цепочка hello world
-
-```
-SQLite (таблица message)
-   → Flask: GET /api/hello (модель Message)
-   → Axios: api.get('/hello') в src/pages/home.js
-   → текст на странице
-```
-
-Строка `hello world` попадает в базу скриптом из папки `backend/scripts`, а не при старте приложения.
 
 ## Быстрый старт (Docker)
 
@@ -75,18 +124,20 @@ cp .env.example .env
 docker compose up --build
 ```
 
-В соседнем терминале примените миграции и добавьте данные:
+Поднимаются два сервиса:
 
-```bash
-docker compose exec backend flask --app main db upgrade
-docker compose exec backend python -m scripts.seed_all
-```
+- `backend` — API на http://localhost:5000
+- `frontend` — панель на http://localhost:5173
 
-После этого:
+При старте backend сам применяет миграции и создаёт администратора из `.env`.
+Файла базы отдельно создавать не нужно.
 
-- Фронтенд: http://localhost:5173 (на странице должно быть `hello world`)
-- Бекенд: http://localhost:5000/api/hello
-- Проверка бека: http://localhost:5000/api/health
+Полезные адреса:
+
+- Swagger: http://localhost:5000/api/v1/docs
+- ReDoc: http://localhost:5000/api/v1/redoc
+- Проверка живости: http://localhost:5000/api/v1/health
+- Панель: http://localhost:5173
 
 Остановка:
 
@@ -94,11 +145,14 @@ docker compose exec backend python -m scripts.seed_all
 docker compose down
 ```
 
-Файл базы лежит в `backend/instance/app.db` на вашем компьютере (папка `backend` примонтирована в контейнер), поэтому данные сохраняются между перезапусками. Чтобы начать с чистой базы, остановите контейнеры, удалите этот файл и снова выполните `db upgrade` и `seed_all`.
+Файл базы лежит в `backend/instance/app.db` на вашем компьютере (папка `backend`
+примонтирована в контейнер), поэтому данные сохраняются между перезапусками.
+Чтобы начать с чистой базы: `docker compose down`, удалите `backend/instance/app.db`
+и снова выполните `docker compose up --build`.
 
 ## Запуск без Docker
 
-Нужны Python 3.12+ и Node.js 22+. Ставить базу данных не нужно: SQLite встроена в Python.
+Нужны Python 3.12+ и Node.js 22+. База данных не нужна: SQLite встроена в Python.
 
 ### Backend
 
@@ -107,27 +161,26 @@ docker compose down
 ```bash
 cd backend
 
-# создать виртуальное окружение
-python -m venv venv
+# виртуальное окружение
+python -m venv .venv
 
 # активировать
-source venv/bin/activate        # Linux / macOS
-venv\Scripts\activate           # Windows (cmd / PowerShell)
+source .venv/bin/activate          # Linux / macOS
+.venv\Scripts\activate             # Windows (cmd / PowerShell)
 
-# установить зависимости
+# зависимости
 pip install -r requirements.txt
 
-# применить миграции и добавить данные
-flask --app main db upgrade
+# схема БД + администратор из .env + тестовые данные
+alembic upgrade head
 python -m scripts.seed_all
 
-# запустить сервер
-flask --app main run --debug
+# сервер
+uvicorn main:app --host 0.0.0.0 --port 5000 --reload
 ```
 
-Бекенд будет доступен на http://localhost:5000/api/hello.
-
-Выйти из виртуального окружения: `deactivate`. После установки новых библиотек обновляйте зависимости: `pip freeze > requirements.txt`.
+API будет доступен на http://localhost:5000/api/v1/docs.
+Выйти из окружения: `deactivate`.
 
 ### Frontend
 
@@ -139,470 +192,276 @@ npm install
 npm run dev
 ```
 
-Фронтенд будет доступен на http://localhost:5173. Адрес API берётся из переменной `VITE_API_URL`. Если она не задана, используется `http://localhost:5000/api`, так что для локального запуска ничего настраивать не нужно.
+Панель: http://localhost:5173. Адрес API берётся из переменной `VITE_API_URL`
+(в `.env` уже прописано `http://localhost:5000/api/v1`).
 
 Другие команды:
 
 ```bash
 npm run build      # продакшен-сборка в папку dist/
 npm run preview    # локальный просмотр собранной версии
-npm install <пакет>
+```
+
+## Роли и доступ
+
+| Действие | Администратор | Пользователь |
+|----------|:-------------:|:------------:|
+| Смотреть список платежей | ✅ | ✅ |
+| Отмечать оплату и править фактическую дату | ✅ | ✅ |
+| Добавлять и удалять регулярные платежи | ✅ | ❌ |
+| Создавать, менять и удалять пользователей | ✅ | ❌ |
+
+Администратор задаётся в `.env` (`ADMIN_USERNAME`, `ADMIN_PASSWORD`). Его учётную
+запись нельзя изменить или удалить через панель.
+
+## API
+
+Префикс всех эндпоинтов — `/api/v1`.
+
+| Метод | Эндпоинт | Назначение |
+|--------|-----------|------------|
+| POST | `/api/v1/auth/login` | Вход по логину и паролю |
+| GET | `/api/v1/auth/me` | Текущий пользователь |
+| POST | `/api/v1/auth/logout` | Завершение сессии |
+| GET | `/api/v1/recurring-payments` | Список регулярных платежей |
+| POST | `/api/v1/recurring-payments` | Создать регулярный платёж (админ) |
+| DELETE | `/api/v1/recurring-payments/{id}` | Прекратить платёж, сохранив историю (админ) |
+| GET | `/api/v1/payment-occurrences` | Периоды: оплаченные и просроченные |
+| GET | `/api/v1/payment-occurrences/{id}` | Конкретный период |
+| PATCH | `/api/v1/payment-occurrences/{id}` | Подтвердить/отменить оплату, исправить дату |
+| GET | `/api/v1/payments/summary` | Итоги по валютам |
+| GET | `/api/v1/users` | Список пользователей (админ) |
+| POST | `/api/v1/users` | Создать пользователя (админ) |
+| PATCH | `/api/v1/users/{id}` | Изменить пользователя (админ) |
+| DELETE | `/api/v1/users/{id}` | Удалить пользователя (админ) |
+| GET | `/api/v1/health` | Проверка живости |
+
+Дополнительно: `GET /api/hello` — совместимость с фронтом, у которого базовый
+адрес по умолчанию `http://localhost:5000/api`.
+
+Авторизация — заголовок `Authorization: Bearer <token>`. В Swagger есть кнопка
+**Authorize**: сначала выполните `POST /api/v1/auth/login`, скопируйте
+`access_token` и вставьте её в поле.
+
+### Формат ошибок
+
+Единый для всех ответов, фронт на него рассчитан:
+
+```json
+{
+  "code": 403,
+  "status": "Forbidden",
+  "message": "Действие доступно только администратору"
+}
+```
+
+При ошибке валидации в `message` — причина (например, «Сумма должна быть больше нуля»).
+
+### OpenAPI-спецификация
+
+FastAPI отдаёт спецификацию на `/api/v1/openapi.json`. Копия лежит в репозитории —
+`backend/openapi.json`. Обновить:
+
+```bash
+cd backend
+python -m scripts.export_openapi
 ```
 
 ## Миграции
 
-Схема БД хранится в папке `backend/migrations/` и коммитится в git. Так у всех в команде одинаковая структура таблиц.
-
-**Первая миграция проекта** (делает один человек, один раз):
-
-```bash
-flask --app main db init
-flask --app main db migrate -m "create message"
-flask --app main db upgrade
-```
-
-**Изменили модель:**
+Схема БД хранится в `backend/migrations/` и коммитится в git — у всех в команде
+одинаковая структура таблиц.
 
 ```bash
-flask --app main db migrate -m "что изменили"
-flask --app main db upgrade
+# применить миграции
+alembic upgrade head
+
+# изменили модель — создать миграцию
+alembic revision --autogenerate -m "что изменили"
+alembic upgrade head
 ```
 
-Новый файл из `migrations/versions/` нужно закоммитить.
-
-**Подтянули чужие изменения** (`git pull`):
+В Docker добавьте `docker compose exec backend`, например:
 
 ```bash
-flask --app main db upgrade
+docker compose exec backend alembic upgrade head
 ```
 
-В Docker перед каждой командой добавляйте `docker compose exec backend`.
+Первая миграция (`0001_initial`) создаёт таблицы прямо из моделей — так схема и
+модели не могут разойтись. Дальше работает обычный цикл с `--autogenerate`.
 
-> Модели нужно импортировать в `app/__init__.py` (строка `from .models import Message`),
-> иначе Flask-Migrate их не увидит.
+Новый файл из `migrations/versions/` нужно закоммитить. Если две ветки создали
+миграции одновременно, Alembic сообщит о нескольких «головах» (heads) — сводите
+их командой `alembic merge heads -m "merge"`.
 
-Если две ветки создали миграции одновременно, Alembic сообщит о нескольких «головах» (heads). Исправление:
+### Изменил модель — что делать
+
+`create_all` умеет только **создавать** таблицы: изменили модель — таблица в базе
+осталась старой, и приложение падает позже, на первой же записи, с невнятной
+ошибкой («no such column», «NOT NULL constraint failed»).
+
+Чтобы этого не было, при старте контейнера схема сверяется с моделями:
 
 ```bash
-flask --app main db merge heads -m "merge"
+cd backend
+python -m scripts.check_schema
 ```
+
+- если всё совпадает — `Схема базы совпадает с моделями`;
+- если разошлось — скрипт печатает, чего не хватает, и **контейнер не
+  поднимается** (в логах будет и текст ошибки, и подсказка). Лучше не подняться
+  вовсе, чем работать наполовину.
+
+Исправить расхождение — одна команда (данные базы удалятся, демо-данные и
+администратор из `.env` создадутся заново):
+
+```bash
+cd backend
+python -m scripts.reset_db          # с подтверждением
+python -m scripts.reset_db -y       # без вопроса
+```
+
+В Docker то же самое:
+
+```bash
+docker compose exec backend python -m scripts.reset_db -y
+docker compose up -d backend
+```
+
+Если данные нужно сохранить (например, в on-premise с реальными платежами) —
+пишите настоящие миграции: `alembic revision --autogenerate -m "что изменили"`
+и `alembic upgrade head`.
 
 ## Скрипты с данными
 
-Папка `backend/scripts/` содержит скрипты, которые наполняют базу. Каждый скрипт лежит в отдельном файле с функцией `run()`, а `seed_all.py` запускает их по списку. Скрипты идемпотентные: повторный запуск не создаёт дубликаты.
+Папка `backend/scripts/` — скрипты, которые наполняют базу. Каждый лежит в
+отдельном файле с функцией `run(db)`, `seed_all.py` запускает их по списку.
+Скрипты идемпотентные: повторный запуск не создаёт дубликаты.
 
 ```bash
+cd backend
 python -m scripts.seed_all
 ```
 
-Запускайте именно так, из папки `backend/`. Если выполнить файл напрямую (`python scripts/seed_all.py`), импорты не сработают.
+- `seed_admin` — администратор из `.env` (логин и пароль обновляются при смене `.env`).
+- `seed_demo` — демо-данные: аренда в рублях, сервер в долларах, подписка в евро
+  и два пользователя (`user` / `user12345`, `anna` / `anna12345`). Отключается
+  переменной `SEED_DEMO_DATA=false`.
 
-Добавить новый набор данных: создайте файл `scripts/seed_xxx.py` с функцией `run()` и добавьте его в список `SEEDS` в `seed_all.py`.
+Служебные скрипты (запускаются отдельно, не сиды):
+
+| Скрипт | Что делает |
+|---------|------------|
+| `python -m scripts.check_schema` | сверяет схему базы с моделями, при расхождении — ненулевой код возврата |
+| `python -m scripts.reset_db` | пересоздаёт базу по актуальным моделям (данные пропадают) |
+| `python -m scripts.export_openapi` | обновляет `backend/openapi.json` |
+
+Запускайте именно так, из папки `backend/`: при прямом запуске файла
+(`python scripts/seed_all.py`) импорты не сработают.
+
+## Telegram-напоминания
+
+1. Создайте бота через @BotFather и получите токен.
+2. Узнайте `chat_id` чата: напишите боту любое сообщение и откройте
+   `https://api.telegram.org/bot<ТОКЕН>/getUpdates` — нужное поле `chat.id`.
+   Для группы id отрицательный, и в группе надо написать `@твой_бот тест`
+   (privacy mode: бот видит только сообщения, где его упомянули).
+3. Пропишите в `.env`:
+
+```
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF...
+TELEGRAM_CHAT_ID=-1001234567890
+```
+
+4. Напоминания рассылает отдельный процесс — `backend/app/worker.py`:
+
+```bash
+cd backend
+python -m app.worker
+```
+
+В Docker он поднимается отдельным сервисом `worker` (см. `docker-compose.yaml`).
+Worker не запускает миграции — этим занимается `backend`, иначе два процесса
+одновременно меняли бы одну SQLite-базу.
+
+Напоминание приходит минимум за `REMINDER_DAYS_BEFORE` дней (по умолчанию 3) до
+срока: название, сумма, валюта и дата оплаты. Дублей нет: период помечается
+отправленным атомарным UPDATE, повторная проверка его не отправляет заново.
+Оплаченный период напоминания не вызывает.
+
+## Тесты
+
+```bash
+cd backend
+pytest
+```
+
+`tests/test_api.py` — доступ, роли, контракт, валидация.
+`tests/test_domain_logic.py` — сценарии приёмки: генерация периодов, статусы
+и просрочка, напоминания (отправка в Telegram подменена, реальных сообщений
+тесты не шлют).
+
+## Переменные окружения
+
+| Переменная | По умолчанию | Назначение |
+|------------|--------------|------------|
+| `DATABASE_URL` | `sqlite:///./instance/app.db` | Подключение к БД |
+| `JWT_SECRET_KEY` | — | Секрет подписи токенов (обязательно задать) |
+| `ADMIN_USERNAME` | `admin` | Логин администратора |
+| `ADMIN_PASSWORD` | `admin` | Пароль администратора |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `720` | Сколько живёт токен |
+| `APP_TIMEZONE` | `Europe/Moscow` | Часовой пояс приложения |
+| `TELEGRAM_BOT_TOKEN` | — | Токен Telegram-бота |
+| `TELEGRAM_CHAT_ID` | — | Чат для напоминаний |
+| `REMINDER_DAYS_BEFORE` | `3` | За сколько дней напоминать |
+| `REMINDER_CHECK_INTERVAL_SECONDS` | `60` | Период проверки напоминаний |
+| `SEED_DEMO_DATA` | `true` | Создавать демо-данные |
+| `CORS_ORIGINS` | `*` | Разрешённые источники |
+| `VITE_API_URL` | `http://localhost:5000/api/v1` | Адрес API для фронта |
 
 ## Частые проблемы
 
-**`ImportError: cannot import name 'bp' from 'app.routes.hello'`**
-Файл `hello.py` пустой или не сохранён, либо Blueprint в нём назван не `bp`. Проверьте файл и сохраните его.
+**`alembic upgrade head` не находит ревизию**
 
-**`NameError: name 'Message' is not defined`**
-В `app/__init__.py` нет строки `from .models import Message` (или остался старый блок с `db.create_all()`, которого быть не должно).
+В базе осталась старая версия миграций. Начните с чистой базы: остановите
+контейнеры, удалите `backend/instance/app.db` и повторите миграцию.
 
-**`No changes in schema detected` при `db migrate`**
-Таблица уже есть в базе (например, осталась от старого `create_all`). Удалите `backend/instance/app.db` и пустые файлы миграций в `migrations/versions/`, затем повторите `db migrate`. В выводе должна быть строка `Detected added table 'message'`.
+**`/api/v1/docs` не открывается**
 
-**`/api/hello` возвращает ошибку 500**
-Таблица пустая: выполните `python -m scripts.seed_all`.
+Бекенд не запущен или упал при старте. Смотрите `docker compose logs backend`.
+Частая причина — не прошла миграция: сообщение будет в логах при старте.
 
 **Страница показывает «Не удалось получить данные с сервера»**
-Бек не запущен или адрес в `VITE_API_URL` неверный. Смотрите вкладку Network в DevTools браузера.
 
-**Бек работает с другим файлом БД, чем вы думаете**
-Относительный путь `sqlite:///app.db` Flask-SQLAlchemy считает от папки `instance`. Если в терминале задана переменная `DATABASE_URL`, она перебивает значение по умолчанию. Узнать, какой файл используется:
+Бек не запущен или адрес в `VITE_API_URL` неверный. Смотрите вкладку Network
+в DevTools браузера.
 
-```bash
-python -c "from app import create_app; from app.extensions import db; a=create_app(); a.app_context().push(); print(db.engine.url)"
-```
+**401 вместо сообщения об ошибке**
+
+Токен истёк или был завершён через `POST /api/v1/auth/logout`. Войдите заново.
 
 **После смены зависимостей фронта в Docker остались старые пакеты**
-`node_modules` лежит в анонимном томе. Пересоберите так:
+
+`node_modules` лежит в анонимном томе. Пересоберите:
 
 ```bash
 docker compose up --build --renew-anon-volumes
 ```
 
----
+**Ошибка «address already in use»**
 
-## Создание проекта с нуля
+Порт 5000 занят. Поменяйте его в `docker-compose.yaml` (и в `VITE_API_URL`).
 
-Этот раздел нужен, если каркас ещё не создан.
-
-### 1. Каркас
-
-```bash
-mkdir project && cd project
-git init
-mkdir -p backend/app/models backend/app/routes backend/scripts
-touch backend/app/models/__init__.py backend/app/routes/__init__.py backend/scripts/__init__.py
-
-# Frontend (Vite, чистый JS)
-npm create vite@latest frontend -- --template vanilla
-cd frontend
-npm install
-npm install axios
-npm install tailwindcss @tailwindcss/vite
-cd ..
-```
-
-Из шаблона Vite удалите лишнее: `src/counter.js`, `src/style.css`, `src/javascript.svg`.
-
-### 2. Frontend
-
-`frontend/vite.config.js`:
-
-```js
-import { defineConfig } from 'vite'
-import tailwindcss from '@tailwindcss/vite'
-
-export default defineConfig({
-  plugins: [tailwindcss()],
-  server: { host: true, port: 5173, watch: { usePolling: true } },
-})
-```
-
-`frontend/index.html`:
-
-```html
-<!doctype html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hackathon</title>
-  </head>
-  <body class="bg-slate-900">
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>
-```
-
-`frontend/src/index.css` (одна строка):
-
-```css
-@import "tailwindcss";
-```
-
-`frontend/src/api/client.js`:
-
-```js
-import axios from 'axios'
-
-export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-})
-```
-
-`frontend/src/components/Button.js`:
-
-```js
-export function Button(text, onClick) {
-  const btn = document.createElement('button')
-  btn.className = 'px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-500'
-  btn.textContent = text
-  btn.addEventListener('click', onClick)
-  return btn
-}
-```
-
-`frontend/src/pages/home.js`:
-
-```js
-import { api } from '../api/client.js'
-import { Button } from '../components/Button.js'
-
-export async function renderHome(root) {
-  root.innerHTML = `
-    <div class="min-h-screen flex flex-col items-center justify-center gap-6">
-      <h1 id="message" class="text-4xl font-bold text-white">Загрузка...</h1>
-      <div id="actions"></div>
-    </div>
-  `
-  const title = root.querySelector('#message')
-  const actions = root.querySelector('#actions')
-
-  async function loadMessage() {
-    title.textContent = 'Загрузка...'
-    try {
-      const { data } = await api.get('/hello')
-      title.textContent = data.message
-    } catch {
-      title.textContent = 'Не удалось получить данные с сервера'
-    }
-  }
-
-  actions.append(Button('Обновить', loadMessage))
-
-  await loadMessage()
-}
-```
-
-Данные с сервера вставляйте через `textContent`, а не `innerHTML`, чтобы в страницу не попал чужой HTML.
-
-`frontend/src/main.js`:
-
-```js
-import './index.css'
-import { renderHome } from './pages/home.js'
-
-renderHome(document.querySelector('#app'))
-```
-
-Компонент в чистом JS это просто функция, которая возвращает DOM-элемент (как `Button`). Новая страница это функция `renderXxx(root)` в папке `pages/`.
-
-### 3. Backend
-
-`backend/requirements.txt`:
-
-```
-flask
-flask-sqlalchemy
-flask-migrate
-flask-cors
-python-dotenv
-gunicorn
-```
-
-`backend/app/extensions.py`:
+## Логирование
 
 ```python
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from flask_cors import CORS
-
-db = SQLAlchemy()
-migrate = Migrate()
-cors = CORS()
-```
-
-`backend/app/config.py`:
-
-```python
-import os
-
-class Config:
-    SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///app.db")
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-```
-
-`backend/app/models/message.py`:
-
-```python
-from ..extensions import db
-
-class Message(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    text = db.Column(db.String(255), nullable=False)
-```
-
-`backend/app/models/__init__.py`:
-
-```python
-from .message import Message
-```
-
-`backend/app/routes/health.py`:
-
-```python
-from flask import Blueprint, jsonify
-
-bp = Blueprint("health", __name__)
-
-@bp.get("/health")
-def health():
-    return jsonify(status="ok")
-```
-
-`backend/app/routes/hello.py`:
-
-```python
-from flask import Blueprint, jsonify
-from ..extensions import db
-from ..models import Message
-
-bp = Blueprint("hello", __name__)
-
-@bp.get("/hello")
-def hello():
-    msg = db.session.get(Message, 1)
-    return jsonify(message=msg.text)
-```
-
-`backend/app/__init__.py`:
-
-```python
-from flask import Flask
-from .config import Config
-from .extensions import db, migrate, cors
-from .models import Message  # нужен, чтобы миграции видели модели
-
-def create_app():
-    app = Flask(__name__)
-    app.config.from_object(Config)
-
-    db.init_app(app)
-    migrate.init_app(app, db, render_as_batch=True)
-    cors.init_app(app)
-
-    from .routes.health import router as health_router
-    app.register_blueprint(health_router, url_prefix="/api")
-
-    return app
-```
-
-Параметр `render_as_batch=True` нужен для SQLite: она не умеет многие `ALTER TABLE`, и без этого режима миграции, меняющие существующие таблицы, будут падать.
-
-`backend/main.py`:
-
-```python
-from app import create_app
-
-router = Blueprint("health", __name__)
-
-@router.get("/health")
-def health():
-    return jsonify(status="ok")
-app = create_app()
-```
-
-`backend/scripts/seed_messages.py`:
-
-```python
-from app.extensions import db
-from app.models import Message
-
-def run():
-    if db.session.get(Message, 1) is None:
-        db.session.add(Message(text="hello world"))
-        db.session.commit()
-        print("messages: добавлено")
-    else:
-        print("messages: уже есть, пропускаю")
-```
-
-`backend/scripts/seed_all.py`:
-
-```python
-from app import create_app
-from . import seed_messages
-
-SEEDS = [
-    seed_messages,
-    # сюда добавлять новые скрипты
-]
-
-if __name__ == "__main__":
-    app = create_app()
-    with app.app_context():
-        for seed in SEEDS:
-            seed.run()
-```
-
-### 4. Dockerfile'ы
-
-`backend/Dockerfile`:
-
-```dockerfile
-FROM python:3.12-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["flask", "--app", "main", "run", "--host=0.0.0.0", "--port=5000", "--debug"]
-```
-
-`frontend/Dockerfile`:
-
-```dockerfile
-FROM node:22-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-CMD ["npm", "run", "dev"]
-```
-
-### 5. docker-compose.yml и .env
-
-Сервиса для базы данных нет: SQLite лежит файлом в `backend/instance/`.
-
-`.env.example`:
-
-```
-VITE_API_URL=http://localhost:5000/api
-# DATABASE_URL=sqlite:///app.db
-```
-
-`docker-compose.yml`:
-
-```yaml
-services:
-  backend:
-    build: ./backend
-    env_file: .env
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./backend:/app
-
-  frontend:
-    build: ./frontend
-    env_file: .env
-    ports:
-      - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    depends_on:
-      - backend
-```
-
-Чтобы миграции применялись сами при каждом старте контейнера, добавьте в сервис `backend`:
-
-```yaml
-    command: sh -c "flask --app main db upgrade && flask --app main run --host=0.0.0.0 --port=5000 --debug"
-```
-
-Это работает только после создания папки `migrations/` (после первого `db init`). Данные скриптами лучше оставить ручными, чтобы они не перезаписывали то, что вы наполнили в процессе разработки.
-
-`.gitignore` (минимум):
-
-```
-.env
-node_modules/
-dist/
-__pycache__/
-*.pyc
-venv/
-.venv/
-instance/
-```
-
-Папку `migrations/` в `.gitignore` добавлять нельзя, она должна быть в репозитории.
-
----
-
-## Советы для хакатона
-
-- **Git.** Договоритесь о ветках заранее (`main` плюс по ветке на человека или фичу) и закоммитьте каркас до того, как все начнут писать код. Это убережёт от конфликтов.
-- **Миграции.** Модели меняйте по очереди, а файлы миграций коммитьте сразу, чтобы не получить несколько heads.
-- **Контракт API.** В первый час зафиксируйте список эндпоинтов и формат JSON. Фронт тогда может работать на заглушках, пока бек не готов.
-- **Продакшен-деплой.** Для демо dev-режима обычно достаточно. Если нужен прод, соберите фронт через `npm run build` и отдайте через nginx, а бек запустите через gunicorn (`gunicorn main:app`).
-
----------------ИСПОЛЬЗОВАНИЕ ЛОГГЕРА--------------------
 from app.logging_config import get_logger
-logger = get_logger(__name__) #теперь можем пользоваться
 
+logger = get_logger(__name__)
 
-logger.info("Пользователь зарегистрирован") #для отметки этапа
-logger.warning("Email уже занят") #для предвиденной ошибки
-logger.exception("Ошибка при сохранении")    #Для полной информации об ошибке(с трейсбеком)
+logger.info("Пользователь зарегистрирован")   # обычное событие
+logger.warning("Email уже занят")             # предупреждение
+logger.exception("Ошибка при сохранении")     # с трейсбеком
+```
+
+Пишутся в stdout — их видно в `docker compose logs backend`.

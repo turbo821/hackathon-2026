@@ -1,4 +1,5 @@
 services:
+  # API
   backend:
     build: ./backend
     env_file: .env
@@ -6,7 +7,9 @@ services:
       - "5000:5000"
     volumes:
       - ./backend:/app
+    restart: unless-stopped
 
+  # Панель
   frontend:
     build: ./frontend
     env_file: .env
@@ -17,3 +20,16 @@ services:
       - /app/node_modules
     depends_on:
       - backend
+
+  # Фоновые напоминания в Telegram.
+  # entrypoint переопределён: миграции и сиды выполняет сервис backend,
+  # иначе два процесса будут одновременно менять одну SQLite-базу.
+  worker:
+    build: ./backend
+    env_file: .env
+    entrypoint: ["python", "-m", "app.worker"]
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - backend
+    restart: unless-stopped
