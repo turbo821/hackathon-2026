@@ -45,7 +45,6 @@
             <div class="container dashboard-container" id="tab-payments">
                 <div class="dashboard-header">
                     <h2>Мои платежи</h2>
-                    <button id="add-payment-btn" class="btn hidden" onclick="openModal()">+ Добавить платеж</button>
                 </div>
 
                 <div class="work blocks summary-cards">
@@ -64,6 +63,13 @@
                         <h3 id="sum-eur" class="summary-amount">€0</h3>
                         <p>Итого к оплате</p>
                     </div>
+                </div>
+
+                <div class="filters-container">
+                    <button class="filter-btn active" onclick="filterPayments('all', this)">Все</button>
+                    <button class="filter-btn" onclick="filterPayments('unpaid', this)">К оплате</button>
+                    <button class="filter-btn" onclick="filterPayments('overdue', this)">Просрочено</button>
+                    <button class="filter-btn" onclick="filterPayments('paid', this)">Оплачено</button>
                 </div>
 
                 <div class="table-container">
@@ -86,7 +92,7 @@
             <div class="container dashboard-container hidden" id="tab-regular">
                 <div class="dashboard-header">
                     <h2>Регулярные платежи</h2>
-                    <button class="btn" onclick="alert('Функционал в разработке')">+ Добавить шаблон</button>
+                    <button id="add-payment-btn" class="btn hidden" onclick="openModal()">+ Добавить платеж</button>
                 </div>
                 <p style="color: #ccc; margin-top: 20px;">Здесь будет список шаблонов регулярных платежей.</p>
             </div>
@@ -94,7 +100,7 @@
             <div class="container dashboard-container hidden" id="tab-users">
                 <div class="dashboard-header">
                     <h2>Пользователи</h2>
-                    <button class="btn" onclick="alert('Функционал в разработке')">+ Добавить пользователя</button>
+                    <button id="add-user-btn" class="btn hidden" onclick="alert('Функционал в разработке')">+ Добавить пользователя</button>
                 </div>
                 <p style="color: #ccc; margin-top: 20px;">Здесь будет список пользователей системы.</p>
             </div>

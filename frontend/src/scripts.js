@@ -1,5 +1,6 @@
 const API_URL = 'http://localhost:5000/api/v1'; 
 let myRole = 'admin'; 
+let globalPayments = []; 
 
 async function handleLogin() {
     const email = document.getElementById('email').value;
@@ -13,7 +14,7 @@ async function handleLogin() {
         myRole = 'user';
         localStorage.setItem('token', 'fake-token-user');
         showDashboard();
-    } else if (email === '' | password === ''){
+    } else if (email === '' || password === ''){
         document.getElementById('login-error').classList.remove('hidden');
     }
 }
@@ -34,10 +35,15 @@ function showDashboard() {
     roleSpan.innerText = myRole === 'admin' ? 'admin' : 'user';
     roleSpan.classList.remove('hidden');
 
+    const addPaymentBtn = document.getElementById('add-payment-btn');
+    const addUserBtn = document.getElementById('add-user-btn');
+
     if (myRole === 'admin') {
-        document.getElementById('add-payment-btn').classList.remove('hidden');
+        if (addPaymentBtn) addPaymentBtn.classList.remove('hidden');
+        if (addUserBtn) addUserBtn.classList.remove('hidden');
     } else {
-        document.getElementById('add-payment-btn').classList.add('hidden');
+        if (addPaymentBtn) addPaymentBtn.classList.add('hidden');
+        if (addUserBtn) addUserBtn.classList.add('hidden');
     }
 
     switchTab('payments', document.querySelector('.nav-link.active'));
@@ -45,19 +51,28 @@ function showDashboard() {
 }
 
 async function loadPayments() {
-    let payments = [
+    globalPayments = [
         { id: 1, name: 'Аренда офиса', amount: 50000, currency: 'RUB', date: '2023-11-01', status: 'unpaid', paid_by: null },
         { id: 2, name: 'Аренда офиса', amount: 50000, currency: 'RUB', date: '2023-11-01', status: 'unpaid', paid_by: null },
         { id: 3, name: 'Сервер', amount: 20, currency: 'USD', date: '2023-10-25', status: 'paid', actual_date: '2023-10-24', paid_by: 'Вася' },
         { id: 4, name: 'Подписка', amount: 15, currency: 'EUR', date: '2023-10-20', status: 'overdue', paid_by: null }
     ];
 
+    const allBtn = document.querySelector('.filter-btn');
+    if (allBtn) filterPayments('all', allBtn);
+}
+
+function renderTable(paymentsToRender) {
     const tbody = document.getElementById('payments-table-body');
     tbody.innerHTML = ''; 
 
     let sums = { RUB: 0, USD: 0, EUR: 0 };
 
-    payments.forEach(p => {
+    if (paymentsToRender.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #898989;">Нет платежей по этому фильтру</td></tr>';
+    }
+
+    paymentsToRender.forEach(p => {
         const amount = Number(p.amount) || 0;
         sums[p.currency] += amount;
 
@@ -96,6 +111,19 @@ async function loadPayments() {
     document.getElementById('sum-rub').innerText = sums.RUB.toLocaleString() + ' ₽';
     document.getElementById('sum-usd').innerText = '$' + sums.USD.toLocaleString();
     document.getElementById('sum-eur').innerText = '€' + sums.EUR.toLocaleString();
+}
+
+function filterPayments(filterType, btnElement) {
+    const buttons = document.querySelectorAll('.filter-btn');
+    buttons.forEach(btn => btn.classList.remove('active'));
+    if (btnElement) btnElement.classList.add('active');
+
+    if (filterType === 'all') {
+        renderTable(globalPayments);
+    } else {
+        const filtered = globalPayments.filter(p => p.status === filterType);
+        renderTable(filtered);
+    }
 }
 
 function markPaid(id) {
