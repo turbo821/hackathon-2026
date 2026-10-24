@@ -1,13 +1,10 @@
-"""Тестовые данные: аренда в рублях, сервер в долларах, подписка в евро.
+"""Тестовые данные: администратор, два пользователя и платежи
+(аренда в рублях, сервер в долларах, подписка в евро).
 
 Запуск: python -m scripts.seed_demo (или вместе со всеми — scripts.seed_all)
 
-Идемпотентно: если платежи уже есть, ничего не делает.
+Идемпотентно: существующие пользователи и платежи не трогаются.
 Отключить: SEED_DEMO_DATA=false в .env.
-
-На этапе «каркас» создаются только шаблоны платежей и два обычных пользователя.
-Периоды (PaymentOccurrence) появятся, когда будет реализована генерация
-периодов — см. app/services/periods.py.
 """
 
 from decimal import Decimal
@@ -19,13 +16,16 @@ from app.auth import hash_password
 from app.config import settings
 from app.logging_config import get_logger
 from app.models import RecurringPayment, User
+from app.models.user import ROLE_ADMIN, ROLE_USER
 from app.timeutils import today
 
 logger = get_logger(__name__)
 
+# (логин, пароль, email, роль)
 DEMO_USERS = [
-    ("user", "user12345", "user@example.com"),
-    ("anna", "anna12345", "anna@example.com"),
+    ("manager", "manager12345", "manager@example.com", ROLE_ADMIN),
+    ("user", "user12345", "user@example.com", ROLE_USER),
+    ("anna", "anna12345", "anna@example.com", ROLE_USER),
 ]
 
 
@@ -34,10 +34,13 @@ def run(db: Session):
         logger.info("demo: SEED_DEMO_DATA=false, пропускаю")
         return
 
-    for username, password, email in DEMO_USERS:
-        if not db.scalars(select(User).where(User.username == username)).first():
-            db.add(User(username=username, email=email, password_hash=hash_password(password)))
-            logger.info(f"demo: создан пользователь {username} / {password} ({email})")
+    for username, password, email, role in DEMO_USERS:
+        exists = db.scalars(
+            select(User).where((User.username == username) | (User.email == email))
+        ).first()
+        if not exists:
+            db.add(User(username=username, email=email, role=role, password_hash=hash_password(password)))
+            logger.info(f"demo: создан {role} {email} / {password}")
     db.commit()
 
     if db.scalar(select(func.count()).select_from(RecurringPayment)) > 0:
@@ -45,7 +48,9 @@ def run(db: Session):
         return
 
     on = today()
-    admin = db.scalars(select(User).where(User.username == settings.admin_username.strip())).first()
+    creator = db.scalars(
+        select(User).where(func.lower(User.username) == settings.superadmin_username.strip().lower())
+    ).first()
 
     # Аренда — рубли, сервер — доллары, подписка — евро.
     # Даты считаются от «сегодня», поэтому демо актуально в любой день.
@@ -76,7 +81,7 @@ def run(db: Session):
         ),
     ]
     for rp in payments:
-        rp.created_by_id = admin.id if admin else None
+        rp.created_by_id = creator.id if creator else None
         db.add(rp)
     db.commit()
     logger.info("demo: созданы тестовые платежи (RUB, USD, EUR)")

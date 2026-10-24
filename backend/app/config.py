@@ -17,10 +17,11 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 720
 
-    # --- Администратор (только из .env, через API не управляется) ---
-    admin_username: str = "admin"
-    admin_password: str = "admin"
-    admin_email: str = "admin@example.com"
+    # --- Суперадмин (только из .env, через API не управляется) ---
+    # Создаёт администраторов; сами администраторы живут в БД.
+    superadmin_username: str = "superadmin"
+    superadmin_password: str = "superadmin"
+    superadmin_email: str = "superadmin@example.com"
 
     # --- Даты ---
     # Единый часовой пояс приложения: «сегодня», просрочка и напоминания считаются в нём
