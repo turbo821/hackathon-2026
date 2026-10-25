@@ -18,7 +18,7 @@ export const CURRENCY_SIGNS = { RUB: '₽', USD: '$', EUR: '€' };
 // Кнопки-фильтры над таблицей → параметры GET /payment-occurrences
 export const PAYMENT_FILTERS = {
     all: {},
-    unpaid: { state: 'pending' },  // ждут оплаты, срок не прошёл
+    unpaid: { state: 'pending', order: 'asc' },  // ждут оплаты, срок не прошёл
     overdue: { state: 'overdue' }, // не оплачены после срока
     paid: { status: 'paid' },      // оплачены (вовремя и с опозданием)
 };
