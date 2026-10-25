@@ -1,8 +1,9 @@
 from datetime import date
 from typing import Literal
+from collections import defaultdict
 
 from fastapi import APIRouter, Query
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.auth import DB, CurrentUser
@@ -41,6 +42,73 @@ def _state_filter(state: str, on: date):
         return and_(O.status == STATUS_PAID, O.paid_at > O.due_date)
     return O.status == STATUS_UNPAID  # unpaid_all
 
+def _clean_occurrences(
+    db: Session,
+    recurring_payment_id: int | None = None,
+    protect_id: int | None = None,
+) -> int:
+    """Удаляет из БД «лишние» периоды (см. правило в исходной реализации).
+
+    protect_id — ID периода, который удалять нельзя. Используется в
+    update_occurrence, чтобы клиент не получил 404, если чистка удалила
+    бы запись, которую он только что обновил. Инвариант «U, P сверху»
+    при этом восстанавливается при следующем чтении списка.
+    """
+    q = select(
+        PaymentOccurrence.id,
+        PaymentOccurrence.recurring_payment_id,
+        PaymentOccurrence.status,
+        PaymentOccurrence.due_date,
+    )
+    if recurring_payment_id is not None:
+        q = q.where(
+            PaymentOccurrence.recurring_payment_id == recurring_payment_id
+        )
+    q = q.order_by(
+        PaymentOccurrence.recurring_payment_id,
+        PaymentOccurrence.due_date.desc(),
+        PaymentOccurrence.id.desc(),
+    )
+
+    by_payment: dict[int, list] = defaultdict(list)
+    for row in db.execute(q).all():
+        by_payment[row.recurring_payment_id].append(row)
+
+    to_delete: list[int] = []
+    for occs in by_payment.values():
+        paid = [o for o in occs if o.status == STATUS_PAID]
+
+        if not paid:
+            earliest = occs[-1]
+            to_delete.extend(
+                o.id
+                for o in occs
+                if o.id != earliest.id and o.id != protect_id
+            )
+            continue
+
+        latest_paid = paid[0]
+        unpaid_after = [
+            o
+            for o in occs
+            if o.status == STATUS_UNPAID and o.due_date > latest_paid.due_date
+        ]
+        if not unpaid_after:
+            continue
+
+        first_unpaid = unpaid_after[-1]
+        to_delete.extend(
+            o.id
+            for o in unpaid_after
+            if o.due_date > first_unpaid.due_date and o.id != protect_id
+        )
+
+    if to_delete:
+        db.execute(
+            delete(PaymentOccurrence).where(PaymentOccurrence.id.in_(to_delete))
+        )
+        db.flush()
+    return len(to_delete)
 
 def _get_occurrence(db: Session, occurrence_id: int) -> PaymentOccurrence:
     occ = db.get(
@@ -52,8 +120,6 @@ def _get_occurrence(db: Session, occurrence_id: int) -> PaymentOccurrence:
     if occ is None:
         raise ApiError(404, "Платёж не найден")
     return occ
-
-
 @router.get(
     "",
     response_model=list[OccurrenceOut],
@@ -77,7 +143,7 @@ def list_occurrences(
     include_future: bool = Query(
         True, description="Включать ещё не наступившие периоды"
     ),
-    order: Literal["asc", "desc"] = "asc",
+    order: Literal["asc", "desc"] = "desc",
 ):
     """Каждый элемент — конкретный период регулярного платежа со своим сроком и статусом.
 
@@ -85,6 +151,7 @@ def list_occurrences(
     """
     on = today()
     ensure_all_occurrences(db, on)
+    _clean_occurrences(db)
 
     query = select(PaymentOccurrence).options(joinedload(PaymentOccurrence.marked_by))
     if state:
@@ -138,11 +205,11 @@ def update_occurrence(
     occurrence_id: int, data: OccurrenceUpdate, db: DB, user: CurrentUser
 ):
     """
-    - `{"status": "paid"}` — оплачено сегодня;
-    - `{"status": "paid", "paid_at": "2026-10-20"}` — оплачено в указанную дату;
-    - `{"paid_at": "2026-10-19"}` — исправить дату у оплаченного периода
+    - {"status": "paid"} — оплачено сегодня;
+    - {"status": "paid", "paid_at": "2026-10-20"} — оплачено в указанную дату;
+    - {"paid_at": "2026-10-19"} — исправить дату у оплаченного периода
       (просрочка пересчитывается, срок не меняется);
-    - `{"status": "unpaid"}` — отменить отметку, дата очищается.
+    - {"status": "unpaid"} — отменить отметку, дата очищается.
 
     Доступно и администратору, и пользователю.
     """
@@ -154,7 +221,6 @@ def update_occurrence(
         raise ApiError(
             409, "Сначала отметьте оплату (status=paid), потом исправляйте дату"
         )
-
     new_status = data.status if "status" in fields and data.status else occ.status
     if new_status == STATUS_PAID:
         if "paid_at" in fields and data.paid_at is None:
@@ -174,5 +240,6 @@ def update_occurrence(
     payment = db.get(RecurringPayment, occ.recurring_payment_id)
     if payment is not None:
         ensure_occurrences(db, payment, on)
+    _clean_occurrences(db, occ.recurring_payment_id, protect_id=occurrence_id)  # <-- только затронутый шаблон
     db.commit()
     return occurrence_to_dict(_get_occurrence(db, occurrence_id), on)

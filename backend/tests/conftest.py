@@ -20,8 +20,28 @@ from app import (
 )
 from app.db import Base, get_db, make_engine  # noqa: E402
 from app.main import app  # noqa: E402
+from app.services import telegram as telegram_client  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def no_real_telegram(monkeypatch):
+    """Тесты не ходят в Telegram: отправки перехватываются по умолчанию.
+
+    Без этого тест, который не подменяет send_message сам, ушёл бы в сеть и
+    повис на таймауте (в тестах Telegram токен «настроен» — значит отправка
+    реально attempted). Тесты, которым нужен свой перехват, подменяют
+    send_message позже и перебивают эту заглушку.
+    """
+    sent: list[str] = []
+    monkeypatch.setattr(
+        telegram_client,
+        "send_message",
+        lambda text, chat_id=None, reply_markup=None: sent.append(text) or {"ok": True},
+    )
+    return sent
+
 
 TODAY = date(2026, 10, 23)
 
@@ -83,7 +103,12 @@ def admin(client, superadmin):
     """Обычный администратор — его создаёт суперадмин."""
     r = client.post(
         "/api/v1/users",
-        json={"username": "boss", "password": "boss12345", "email": "boss@example.com", "role": "admin"},
+        json={
+            "username": "boss",
+            "password": "boss12345",
+            "email": "boss@example.com",
+            "role": "admin",
+        },
         headers=superadmin,
     )
     assert r.status_code == 201, r.json()

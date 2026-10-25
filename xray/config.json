@@ -1,0 +1,72 @@
+{
+  "log": {
+    "loglevel": "warning",
+    "access": "",
+    "error": ""
+  },
+  "dns": {
+    "servers": ["localhost"],
+    "queryStrategy": "UseIPv4"
+  },
+  "inbounds": [
+    {
+      "tag": "socks-in",
+      "listen": "172.17.0.1",
+      "port": 1080,
+      "protocol": "socks",
+      "settings": {
+        "auth": "noauth",
+        "udp": true,
+        "userLevel": 8
+      }
+    },
+    {
+      "tag": "http-in",
+      "listen": "172.17.0.1",
+      "port": 8080,
+      "protocol": "http",
+      "settings": {
+        "userLevel": 8
+      }
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "warp",
+      "protocol": "socks",
+      "settings": {
+        "servers": [
+          {
+            "address": "127.0.0.1",
+            "port": 40000
+          }
+        ]
+      },
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIPv4"
+        }
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom",
+      "settings": {},
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIPv4"
+        }
+      }
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": ["socks-in", "http-in"],
+        "outboundTag": "warp"
+      }
+    ]
+  }
+}

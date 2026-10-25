@@ -7,13 +7,14 @@
 Должен работать ровно в одном экземпляре (отдельный контейнер `worker`).
 """
 
+import logging
 import signal
 import threading
 import time
 
 from app.config import settings
 from app.db import SessionLocal
-from app.logging_config import get_logger, setup_logging
+from app.logging_config import get_logger, log_event, setup_logging, timed
 from app.services import telegram
 from app.services.bot import poll_once
 from app.services.reminders import check_and_send
@@ -33,9 +34,11 @@ def run_once() -> int:
     """Один проход проверки. Возвращает число отправленных напоминаний."""
     db = SessionLocal()
     try:
-        return check_and_send(db)
+        with timed(logger, "worker.check_pass"):
+            return check_and_send(db)
     except Exception:
         logger.exception("Ошибка при проверке напоминаний")
+        log_event(logger, logging.ERROR, "worker.check_failed", exc_info=True)
         db.rollback()
         return 0
     finally:

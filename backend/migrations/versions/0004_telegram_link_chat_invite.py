@@ -1,7 +1,7 @@
 """Ссылка-приглашение в чат для привязки Telegram-аккаунта
 
-Revision ID: 0003_telegram_link_chat_invite
-Revises: 0002_user_email
+Revision ID: 0004_telegram_link_chat_invite
+Revises: 0003_user_role
 Create Date: 2026-10-24
 
 Панель просит у бота персональную ссылку-приглашение в чат: код привязки

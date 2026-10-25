@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Invoice Keeper</title>
-    <title><link type="image/png" sizes="96x96" rel="icon" href=".../icons8-монеты-ios_filled-96.png">Invoice Keeper</title>
-    <link rel="stylesheet" href="src/my.css">
-    <link rel="shortcut icon" href="images/icons8-монеты-96.png" type="image/x-icon">
-
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap">
 </head>
 <body>
     <div class="wrapper">
@@ -16,27 +16,28 @@
 
             <nav id="main-nav" class="hidden">
                 <ul>
-                    <li><a href="#" class="nav-link active" data-tab="payments" onclick="event.preventDefault(); switchTab('payments', this)">Платежи</a></li>
-                    <li><a href="#" class="nav-link" data-tab="regular" onclick="event.preventDefault(); switchTab('regular', this)">Регулярные</a></li>
-                    <li id="nav-users" class="hidden"><a href="#" class="nav-link" data-tab="users" onclick="event.preventDefault(); switchTab('users', this)">Пользователи</a></li>
+                    <li><a href="#" class="nav-link active" data-tab="payments">Фактические платежи</a></li>
+                    <li><a href="#" class="nav-link" data-tab="regular">Регулярные</a></li>
+                    <li id="nav-users" class="hidden"><a href="#" class="nav-link" data-tab="users">Пользователи</a></li>
                 </ul>
 
                 <div class="nav-right">
-                    <a href="https://t.me/+L3md-k-VAcswMzhi" target="_blank" class="telegram-link">
-                        <img src="/src/img/telegram.png" alt="Telegram" class="telegram-img">
+                    <a href="https://t.me/+TKeMq1v9SwQ0Njgy" target="_blank" rel="noopener" class="telegram-link" title="Чат в Telegram">
+                        <img src="./src/assets/telegram.png" alt="Telegram" class="telegram-img">
                     </a>
                     <span id="user-role" class="hidden"></span>
-                    <a href="#" id="logout-btn" class="hidden" onclick="logout(event)">Выйти</a>
+                    <a href="#" id="logout-btn" class="hidden">Выйти</a>
                 </div>
             </nav>
         </header>
 
+        <!-- Вход -->
         <div class="hero container" id="login-screen">
             <div class="login-box">
                 <h2>Добро пожаловать</h2>
                 <h1>Вход в систему</h1>
 
-                <form class="login-form" onsubmit="handleLogin(event)">
+                <form class="login-form" id="login-form">
                     <input type="email" id="email" placeholder="Почтовый адрес" class="input-field" autocomplete="username">
                     <input type="password" id="password" placeholder="Пароль" class="input-field" autocomplete="current-password">
                     <button type="submit" id="login-btn" class="btn btn-full">Войти</button>
@@ -47,25 +48,26 @@
 
         <div id="dashboard-screen" class="hidden">
 
+            <!-- Вкладка: платежи (периоды) -->
             <div class="container dashboard-container" id="tab-payments">
                 <div class="dashboard-header">
                     <h2>Платежи</h2>
                 </div>
 
-                <div class="work blocks summary-cards">
-                    <div class="block summary-card">
+                <div class="summary-cards">
+                    <div class="summary-card">
                         <span class="badge green">RUB</span>
                         <h3 id="sum-rub" class="summary-amount">—</h3>
                         <p>Итого к оплате</p>
                         <p id="over-rub" class="summary-overdue"></p>
                     </div>
-                    <div class="block summary-card">
+                    <div class="summary-card">
                         <span class="badge purple">USD</span>
                         <h3 id="sum-usd" class="summary-amount">—</h3>
                         <p>Итого к оплате</p>
                         <p id="over-usd" class="summary-overdue"></p>
                     </div>
-                    <div class="block summary-card">
+                    <div class="summary-card">
                         <span class="badge brown">EUR</span>
                         <h3 id="sum-eur" class="summary-amount">—</h3>
                         <p>Итого к оплате</p>
@@ -73,11 +75,11 @@
                     </div>
                 </div>
 
-                <div class="filters-container">
-                    <button class="filter-btn active" onclick="filterPayments('all', this)">Все</button>
-                    <button class="filter-btn" onclick="filterPayments('unpaid', this)">К оплате</button>
-                    <button class="filter-btn" onclick="filterPayments('overdue', this)">Просрочено</button>
-                    <button class="filter-btn" onclick="filterPayments('paid', this)">Оплачено</button>
+                <div class="filters-container" id="payment-filters">
+                    <button class="filter-btn active" data-filter="all">Все</button>
+                    <button class="filter-btn" data-filter="unpaid">К оплате</button>
+                    <button class="filter-btn" data-filter="overdue">Просрочено</button>
+                    <button class="filter-btn" data-filter="paid">Оплачено</button>
                 </div>
 
                 <div class="table-container">
@@ -97,14 +99,15 @@
                 </div>
             </div>
 
+            <!-- Вкладка: регулярные платежи (шаблоны) -->
             <div class="container dashboard-container hidden" id="tab-regular">
                 <div class="dashboard-header">
                     <h2>Регулярные платежи</h2>
-                    <button id="add-payment-btn" class="btn hidden" onclick="openModal()">+ Добавить платеж</button>
+                    <button id="add-payment-btn" class="btn hidden">+ Добавить платеж</button>
                 </div>
 
                 <label class="checkbox-label">
-                    <input type="checkbox" id="show-inactive" onchange="loadRecurring()">
+                    <input type="checkbox" id="show-inactive">
                     Показывать прекращённые
                 </label>
 
@@ -125,10 +128,11 @@
                 </div>
             </div>
 
+            <!-- Вкладка: пользователи (только админ) -->
             <div class="container dashboard-container hidden" id="tab-users">
                 <div class="dashboard-header">
                     <h2>Пользователи</h2>
-                    <button id="add-user-btn" class="btn hidden" onclick="openModal1()">+ Добавить пользователя</button>
+                    <button id="add-user-btn" class="btn hidden">+ Добавить пользователя</button>
                 </div>
 
                 <div class="table-container">
@@ -150,7 +154,8 @@
         </div>
     </div>
 
-    <div id="modal" class="modal-overlay hidden">
+    <!-- Модалка: новый регулярный платёж -->
+    <div id="payment-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3>Новый платеж</h3>
 
@@ -180,13 +185,14 @@
             </div>
 
             <div class="modal-actions">
-                <button id="save-payment-btn" class="btn" onclick="createPayment()">Сохранить</button>
-                <button class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                <button id="save-payment-btn" class="btn">Сохранить</button>
+                <button id="cancel-payment-btn" class="btn btn-secondary">Отмена</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-user" class="modal-overlay hidden">
+    <!-- Модалка: пользователь (создание и редактирование) -->
+    <div id="user-modal" class="modal-overlay hidden">
         <div class="modal-content">
             <h3 id="user-modal-title">Новый пользователь</h3>
 
@@ -207,24 +213,24 @@
             </div>
 
             <div class="modal-actions">
-                <button id="save-user-btn" class="btn" onclick="createUser()">Сохранить</button>
-                <button class="btn btn-secondary" onclick="closeModal1()">Отмена</button>
+                <button id="save-user-btn" class="btn">Сохранить</button>
+                <button id="cancel-user-btn" class="btn btn-secondary">Отмена</button>
             </div>
         </div>
     </div>
 
-    <!-- Кастомное окно подтверждения удаления/прекращения -->
-    <div id="confirm-modal" class="modal-overlay confirm-overlay hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+    <!-- Окно подтверждения опасных действий -->
+    <div id="confirm-modal" class="modal-overlay hidden" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
         <div class="modal-content confirm-content">
             <h3 id="confirm-title">Подтвердите действие</h3>
             <p id="confirm-message" class="confirm-message"></p>
-            <div class="modal-actions confirm-actions">
+            <div class="modal-actions">
                 <button id="confirm-cancel" type="button" class="btn btn-secondary">Отмена</button>
                 <button id="confirm-accept" type="button" class="btn btn-danger-solid">Удалить</button>
             </div>
         </div>
     </div>
 
-    <script type="module" src="src/scripts.js"></script>
+    <script type="module" src="/src/main.js"></script>
 </body>
 </html>
