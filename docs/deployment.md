@@ -6,71 +6,98 @@
 ## Схема
 
 ```
-                        ┌────────────────────────────┐
-   браузер ────────────►│ frontend (Vite dev, :5173) │
-                        └─────────────┬──────────────┘
-                                      │ /api/v1/* (тот же origin)
-                                      ▼
-                        ┌────────────────────────────┐
-                        │  Vite proxy → backend      │
-                        │  backend (FastAPI, :5000)  │
-                        └─────────────┬──────────────┘
-                                      │ исходящие HTTP(S)/SMTP
-                                      ▼
-                        ┌────────────────────────────┐
-                        │ xray (SOCKS5 :1080)        │
-                        └─────────────┬──────────────┘
-                                      ▼
-                                   интернет
+                        ┌──────────────────────────────────┐
+   браузер ────────────►│ frontend (nginx, :80 → :80)    │
+                        │  статика, собранная Vite         │
+                        └────────────────┬─────────────────┘
+                                         │ /api/* (тот же origin)
+                                         ▼
+                        ┌──────────────────────────────────┐
+                        │ backend (FastAPI, :5000)         │
+                        │ worker  (напоминания + бот)      │
+                        └────────────────┬─────────────────┘
+                                         │ исходящие HTTP(S) и SMTP
+                                         ▼
+                        ┌──────────────────────────────────┐
+                        │ xray (SOCKS5 :1080, HTTP :8080)  │
+                        └────────────────┬─────────────────┘
+                                         ▼
+                                      интернет
 ```
 
-Плюс отдельный сервис `worker` — фоновые напоминания и Telegram-бот.
-
 Все четыре сервиса в общей сети `app-network`. Наружу опубликованы только
-`:5173` (панель) и `:5000` (API/Swagger).
+`:80` (панель) и `:5000` (API/Swagger). Порт xray наружу не публикуется:
+контейнеры обращаются к нему по имени сервиса `xray`.
 
-## Почему xray, а не sing-box
+Запуск — только через Docker Compose: без контейнера `xray` исходящие запросы
+в Telegram и к почте не проходят.
 
-`proxy/sing-box.json` — остаток прошлой схемы, в compose его больше нет.
-Xray-конфиг лежит в `xray/config.json` и валидируется настоящим бинарём:
+## Прокси: xray
+
+Кто и как ходит через прокси (переменные из `.env`):
+
+| Переменная      | Кто использует                                    | Как                                         |
+| --------------- | ------------------------------------------------- | ------------------------------------------- |
+| `PROXY_URL`     | `backend`, `worker` — `ALL_PROXY`/`HTTP(S)_PROXY` | все исходящие HTTP(S)-запросы               |
+| `BOT_PROXY_URL` | клиент Telegram (`services/telegram.py`)          | передаётся в httpx явно                     |
+| `SMTP_PROXY`    | канал почты (`remind_channels/smtp.py`)           | SOCKS5 CONNECT руками, smtplib прокси не умеет |
+
+`NO_PROXY` в compose оставляет внутренние имена (`backend`, `frontend`,
+`worker`, `xray`, `localhost`) напрямую — иначе они уедут в прокси и сломаются.
+
+Конфиг — `xray/config.json`. Проверить его настоящим бинарём:
 
 ```bash
 docker run --rm -v "$PWD/xray/config.json:/etc/xray/config.json:ro" \
   ghcr.io/xtls/xray-core:latest run -test -config /etc/xray/config.json
 ```
 
-Две вещи, которые стоит знать про схему Xray v26 (отличаются от документов
-для старых версий):
+Тем же способом compose проверяет здоровье контейнера (`healthcheck`): в образе
+нет shell и nc, поэтому проверяется сам конфиг.
 
-* входящее соединение описывается полями `protocol` и `port`
-  (не `type` и не `listen_port` — старый `listen_port` **молча игнорируется**,
-  и xray падает с «Listen on specific ip without port»);
-* `sockopt.domainStrategy: "UseIPv4"` — аналог sing-box'овского
-  `domain_strategy: prefer_ipv4`. Без него Telegram отдаёт IPv6-адрес, и
-  цепочка рвётся (socks5 code=4).
+Что важно знать про конфиг:
 
-`dns.servers` в конфиге — `["localhost"]`, а не публичные резолверы: с
-публичными xray перестаёт видеть внутренние имена docker-сети.
+* схема xray — не sing-box: входящее соединение описывается полями
+  `protocol` и `port`, а не `type` и `listen_port`. Конфиг от sing-box xray
+  не поймёт (`listen_port` молча игнорируется, и xray падает с
+  «Listen on specific ip without port»);
+* `sockopt.domainStrategy: "UseIPv4"` — xray сам резолвит домены и берёт
+  только IPv4. Без этого Telegram отдаёт IPv6-адрес, и цепочка рвётся
+  (socks5 code=4);
+* `dns.servers` — `["localhost"]`, то есть системный резолвер контейнера.
+  С публичными резолверами xray перестаёт видеть внутренние имена docker-сети.
 
-## Фронт и бэк: почему `VITE_API_URL=/api/v1`
+`proxy/sing-box.json` — остаток прошлой схемы, в compose его нет.
+
+## Фронт: почему `VITE_API_URL=/api/v1`
 
 Раньше дефолтом стоял `http://backend:5000/api/v1` — **внутреннее имя
 docker-сервиса**. Браузер такое имя не резолвит, поэтому на сервере панель
 показывала «Не удалось связаться с сервером», а Swagger (он открывается по
-внешнему адресу, тот же origin) работал.
+внешнему адресу) работал.
 
 Сейчас адрес относительный: запрос уходит на тот же origin, где открыта
-страница, а dev-сервер Vite перенаправляет `/api` в бэкенд (`server.proxy` в
-`frontend/vite.config.js`). Адрес сервера нигде не зашит, CORS не нужен.
+панель, а nginx в контейнере `frontend` проксирует `/api/` в `backend:5000`
+(`frontend/nginx.conf`). Адрес сервера нигде не зашит, CORS не нужен.
 
-**Важно:** `VITE_API_URL` приходит из `.env` через `env_file` в `process.env`,
-и Vite подставляет его **при трансформации модуля**. Поэтому:
+**Важно:** `VITE_API_URL` — аргумент **сборки** образа (`build.args` в compose),
+Vite вшивает его в JS при `npm run build`. Поэтому:
 
-* правка `.env` без пересоздания контейнера ни на что не влияет —
-  `docker compose up -d --force-recreate frontend`;
-* `environment:` в compose **перекрывает** `env_file`. Если в `frontend`
-  окажется `environment: VITE_API_URL=...`, значение из `.env` будет
-  проигнорировано — это уже случалось.
+* правка `.env` без пересборки ни на что не влияет — нужно
+  `docker compose up -d --build frontend` (`--force-recreate` не поможет);
+* у сервиса `frontend` нет `env_file`, и переменные окружения контейнера
+  на панель не действуют — значение берётся только при сборке.
+
+Ещё о nginx:
+
+* имя `backend` резолвится через `resolver 127.0.0.11` в момент запроса, а не
+  при старте. Иначе, если бэкенд поднялся позже, nginx не стартует с
+  «host not found in upstream»;
+* `index.html` отдаётся с `no-cache`, файлы из `/assets/` (с хешем в имени) —
+  с годовым кешем. После пересборки браузер сразу получает новую версию.
+
+Если npm-реестр недоступен при сборке, задайте зеркало:
+`NPM_REGISTRY=https://registry.npmmirror.com docker compose up --build`.
 
 ## Воркер и SQLite
 
@@ -79,7 +106,7 @@ docker-сервиса**. Браузер такое имя не резолвит,
 SQLite-базу. Миграции и сиды выполняет только `backend`.
 
 База лежит в томе `backend_data`, а не в bind-mount: SQLite в режиме WAL на
-bind-mount Docker Desktop над Windows не работает (не создаются `-wal`/`-shm`).
+bind-mount Docker Desktop под Windows не работает (не создаются `-wal`/`-shm`).
 
 ## Сид и занятый email
 
@@ -88,13 +115,12 @@ bind-mount Docker Desktop над Windows не работает (не созда�
 ошибкой → restart loop). Симптом — `docker compose logs backend | grep -i
 runtimeerror`.
 
-Если email занят — освободить его (переименовать email другого пользователя)
-или задать суперадмину другой.
+Решение — освободить email (сменить его другому пользователю) или задать
+суперадмину другой.
 
 ## Логирование
 
 Настройки: `LOG_LEVEL`, `LOG_FORMAT` (`text` / `json`), `LOG_LEVEL_LIBRARIES`.
-Подробности — в README, раздел «Логирование».
 
 Что важно знать:
 
@@ -112,29 +138,35 @@ runtimeerror`.
 ## Проверка «всё живо»
 
 ```bash
-# фронт отдаёт относительный адрес
-curl -s http://localhost:5173/src/api/client.js | grep -o '"VITE_API_URL": "[^"]*"'
+docker compose ps                                   # все четыре сервиса Up
 
-# прокси-путь жив
+# nginx проксирует API
 curl -s http://localhost:5173/api/v1/hello
+curl -s http://localhost:5173/api/v1/health
 
-# логин через прокси
+# логин через nginx
 curl -s -X POST http://localhost:5173/api/v1/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"email":"<почта>","password":"<пароль>"}'
 
-# почта и телеграм
+# Telegram и почта через прокси
+docker compose exec backend python -m scripts.check_telegram --send
 docker compose exec backend python -m scripts.check_smtp
-docker compose exec backend python -m scripts.check_telegram
+
+# напоминания
+docker compose logs -f worker
 ```
+
+`check_smtp` проверяет прямое TLS-подключение на 465 и не учитывает
+`SMTP_PROXY`/`SMTP_STARTTLS` — при них проверка подключения может показать
+FAIL, хотя worker письма отправляет.
 
 ## Что ещё стоит доделать
 
-* прод-режим фронта: `npm run build` + nginx, который проксирует `/api`
-  (сейчас работает `npm run dev`, а `server.proxy` есть только у dev-сервера);
-* `:5000` опубликован на `0.0.0.0` — с прокси достаточно держать открытым
-  только `:5173`;
-* `JWT_SECRET_KEY` на сервере — заглушка `replace-with-your-own-random-string`
-  из `.env.example`; нужно заменить на `openssl rand -hex 32`;
-* `frontend/src/pages/home.js` — мёртвый код, нигде не импортируется;
-* `proxy/sing-box.json` — больше не используется.
+* `:5000` опубликован на `0.0.0.0` — панель ходит в API через nginx, так что
+  наружу достаточно `:5173` (Swagger доступен и как `:5173/api/v1/docs`);
+* `JWT_SECRET_KEY` на сервере должен быть случайным (`openssl rand -hex 32`),
+  а не значением из `.env.example`;
+* `check_smtp` — подключаться через `_connect()` рабочего кода, чтобы
+  учитывать прокси и STARTTLS;
+* `proxy/sing-box.json` — удалить, больше не используется.
