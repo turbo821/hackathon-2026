@@ -16,16 +16,13 @@ services:
     container_name: xray-proxy
     restart: unless-stopped
     command: ["run", "-config", "/etc/xray/config.json"]
-    # Порт наружу не публикуется: прокси нужен только внутри compose-сети
-    # (контейнеры ходят в него по имени сервиса `xray`), а свободный порт
-    # 1080 на сервере может быть занят — и тогда стек не поднимется.
-    # Для отладки с самого сервера раскомментируйте:
-    # ports:
-    #   - "127.0.0.1:1080:1080"
+    # network_mode: host — xray должен достучаться до WARP-апстрима на
+    # 127.0.0.1:40000 (он слушает только loopback хоста, из bridge-сети
+    # недоступен). Взамен xray слушает только docker0 (172.17.0.1), поэтому
+    # прокси не виден из интернета.
+    network_mode: host
     volumes:
       - ./xray/config.json:/etc/xray/config.json:ro
-    networks:
-      - app-network
     # В образе нет shell/nc, поэтому проверяем конфиг самим бинарём xray:
     # так ловится сломанный или не подхваченный монтированием конфиг.
     healthcheck:
@@ -66,6 +63,8 @@ services:
     # Исходящие HTTP(S)-запросы (Telegram, внешние API) — через xray.
     # NO_PROXY оставляет внутренние адреса (свой бэкенд, соседние сервисы)
     # напрямую, иначе они уедут в прокси и сломаются.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       ALL_PROXY: ${PROXY_URL:-}
       HTTP_PROXY: ${PROXY_URL:-}
@@ -88,6 +87,8 @@ services:
     volumes:
       - ./backend:/app
       - backend_data:/app/instance
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       ALL_PROXY: ${PROXY_URL:-}
       HTTP_PROXY: ${PROXY_URL:-}

@@ -203,7 +203,9 @@ def test_empty_channel_does_not_mask_failed_telegram(client, admin, db, monkeypa
 
     # создание платежа + две проверки = три попытки. Если бы период пометили
     # отправленным после первого падения, Telegram позвали бы один раз.
-    assert len(calls) == 3
+    # Оповещение о новом платеже — отдельное сообщение, его не считаем.
+    reminder_calls = [c for c in calls if "Новый регулярный платёж" not in c]
+    assert len(reminder_calls) == 3
 
 
 # ---------- Связка с напоминаниями ----------
