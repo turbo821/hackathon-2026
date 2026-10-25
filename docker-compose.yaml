@@ -73,6 +73,7 @@ services:
       - ./backend:/app
       - backend_data:/app/instance
 <<<<<<< HEAD
+<<<<<<< HEAD
     # Исходящие HTTP(S)-запросы (Telegram, внешние API) — через xray.
     # NO_PROXY оставляет внутренние адреса (свой бэкенд, соседние сервисы)
     # напрямую, иначе они уедут в прокси и сломаются.
@@ -96,6 +97,21 @@ services:
       # Явно указываем бекэнду использовать SOCKS5 прокси внутри Docker-сети
       - BOT_PROXY_URL=socks5://xray:1080
 >>>>>>> 41254a22ffb451ae5892969791cec17148fb0b81
+=======
+    restart: unless-stopped
+
+  # Панель: статика, собранная Vite, раздаётся через nginx.
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:5000/api/v1}
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+>>>>>>> origin/dev
 
   worker:
     build: ./backend

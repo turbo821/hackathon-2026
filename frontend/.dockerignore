@@ -1,11 +1,15 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 <<<<<<< HEAD
+=======
+>>>>>>> origin/dev
 node_modules
 dist
 .vscode
 .idea
+<<<<<<< HEAD
 *.log
 =======
 =======
@@ -29,3 +33,6 @@ Dockerfile
 =======
 >>>>>>> 0ba6f5d (fix docker)
 >>>>>>> 41254a22ffb451ae5892969791cec17148fb0b81
+=======
+*.log
+>>>>>>> origin/dev
