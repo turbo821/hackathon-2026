@@ -45,10 +45,13 @@ class Settings(BaseSettings):
     smtp_password: SecretStr = SecretStr("")
     smtp_name: str = "Invoice Keeper"
     smtp_subject: str = "Напоминание об оплате"
+<<<<<<< HEAD
     # SOCKS5-прокси для SMTP: socks5://host:port. Нужен там, где до почтового
     # сервера не достучаться напрямую (например, провайдер режет исходящие
     # SMTP-порты или закрыт IPv4).
     smtp_proxy: str = ""
+=======
+>>>>>>> 41254a22ffb451ae5892969791cec17148fb0b81
     # STARTTLS вместо TLS на подключении: порт 587 вместо 465. У Mail.ru
     # на 465 отказывает, а 587 работает.
     smtp_starttls: bool = False

@@ -1,4 +1,5 @@
-FROM node:22-alpine
+# --- Сборка: Vite собирает статику в dist/ ---
+FROM node:22-alpine AS build
 WORKDIR /app
 
 # Реестр npm можно переопределить сборкой: NPM_REGISTRY=https://registry.npmmirror.com
