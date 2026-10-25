@@ -60,6 +60,16 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: str = "*"
 
+    # --- Логирование ---
+    # Уровень корневого логгера: DEBUG, INFO, WARNING, ERROR.
+    # DEBUG подробно показывает запросы SQL — полезно при разборе, но шумно.
+    log_level: str = "INFO"
+    # Формат записей: text (человекочитаемо) или json (для сервера и парсинга).
+    log_format: str = "text"
+    # Уровень для сторонних библиотек (uvicorn, httpx, sqlalchemy).
+    # WARNING — видны только проблемы, а не рутина.
+    log_level_libraries: str = "WARNING"
+
     telegram_bot_username: str = ""
 
 

@@ -8,13 +8,14 @@
 """
 
 import json
+import logging
 import os
 from typing import Any
 
 import httpx
 
 from app.config import settings
-from app.logging_config import get_logger
+from app.logging_config import get_logger, log_event, timed
 
 logger = get_logger(__name__)
 
@@ -59,17 +60,45 @@ def _call(method: str, payload: dict | None = None, timeout: int = TIMEOUT) -> A
     if proxy_url:
         request_kwargs["proxy"] = proxy_url
 
-    response = httpx.post(
-        API_BASE.format(token=settings.telegram_bot_token, method=method),
-        **request_kwargs,
-    )
+    url = API_BASE.format(token=settings.telegram_bot_token, method=method)
+    with timed(logger, "telegram.call", method=method, via_proxy=bool(proxy_url)):
+        try:
+            response = httpx.post(url, **request_kwargs)
+        except Exception as exc:
+            # Здесь чаще всего всё и ломается: прокси недоступен, нет сети,
+            # истёк таймаут. Без этого лога причина не видна — только «ошибка».
+            log_event(
+                logger,
+                logging.ERROR,
+                "telegram.call_failed",
+                method=method,
+                via_proxy=bool(proxy_url),
+                error=type(exc).__name__,
+                detail=str(exc)[:300],
+            )
+            raise
 
     try:
         data = response.json()
     except ValueError:
+        log_event(
+            logger,
+            logging.ERROR,
+            "telegram.bad_response",
+            method=method,
+            status=response.status_code,
+        )
         raise TelegramError(f"Telegram API {response.status_code}: ответ не JSON")
 
     if not data.get("ok"):
+        log_event(
+            logger,
+            logging.ERROR,
+            "telegram.api_error",
+            method=method,
+            status=response.status_code,
+            description=data.get("description"),
+        )
         raise TelegramError(
             f"Telegram API {response.status_code}: {data.get('description')}"
         )
