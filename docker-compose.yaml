@@ -41,9 +41,8 @@ services:
       args:
         NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}
     env_file: .env
-    # Куда dev-сервер проксирует /api в бэкенд (внутри compose-сети).
-    environment:
-      BACKEND_URL: http://backend:5000
+    # Куда dev-сервер проксирует /api — дефолт http://backend:5000 задан
+    # в vite.config.js, поэтому отдельный environment здесь не нужен.
     ports:
       - "5173:5173" # Vite dev-сервер: порт внутри тоже 5173
     volumes:
