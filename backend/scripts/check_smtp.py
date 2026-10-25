@@ -13,11 +13,17 @@
 """
 
 import argparse
+import logging
 import smtplib
 import ssl
 import sys
 
 from app.config import settings
+from app.logging_config import log_event, setup_logging
+
+logger = logging.getLogger("scripts.check_smtp")
+
+REPORT_SEPARATOR = "=" * 60
 
 
 def _mask(value: str) -> str:
@@ -141,6 +147,7 @@ def show_recipients() -> None:
 
 
 def main() -> int:
+    setup_logging(name="check_smtp")
     parser = argparse.ArgumentParser(
         description="Проверка настроек SMTP (подключение, вход, тестовое письмо)"
     )
@@ -155,6 +162,9 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    print(REPORT_SEPARATOR)
+    print("Отчёт проверки SMTP")
+    print(REPORT_SEPARATOR)
     print("Настройки SMTP:")
     print(f"  хост:      {settings.smtp_host}:{settings.smtp_port}")
     print(f"  адрес:     {settings.smtp_addr} (логин на сервере)")
@@ -168,16 +178,34 @@ def main() -> int:
         print("Проблемы в настройках:")
         for item in problems:
             print(f"  - {item}")
+            log_event(logger, logging.ERROR, "smtp.config_invalid", reason=item)
         print()
 
     ok, message = check_connection()
     print(f"Подключение: {'OK' if ok else 'FAIL'} — {message}")
+    log_event(
+        logger,
+        logging.INFO if ok else logging.ERROR,
+        "smtp.connection",
+        ok=ok,
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        detail=message,
+    )
 
     show_recipients()
 
     if ok and args.to:
         sent, send_message = send_test(args.to)
         print(f"Тестовые письма: {'OK' if sent else 'FAIL'} — {send_message}")
+        log_event(
+            logger,
+            logging.INFO if sent else logging.ERROR,
+            "smtp.test_sent",
+            ok=sent,
+            recipients=len(args.to),
+            detail=send_message,
+        )
 
     if not ok or problems:
         print()

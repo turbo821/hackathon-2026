@@ -8,6 +8,7 @@
 - добавили платёж позже, чем за 3 дня до срока → напоминание сразу (remind_for_payment).
 """
 
+import logging
 from datetime import date, timedelta
 from typing import Any, cast
 
@@ -16,7 +17,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.logging_config import get_logger
+from app.logging_config import get_logger, log_event
 from app.models import PaymentOccurrence, RecurringPayment
 from app.models.payment_occurrence import STATUS_UNPAID
 from app.services.periods import ensure_all_occurrences
@@ -105,6 +106,15 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
     # Получатели писем — все адреса из базы. Собираем один раз на проверку,
     # а не на каждый период.
     recipients = email_recipients(db)
+    log_event(
+        logger,
+        logging.INFO,
+        "reminders.batch_start",
+        occurrences=len(occurrences),
+        channels=[ch.__name__ for ch in active_channels],
+        recipients=len(recipients),
+        on=on.isoformat(),
+    )
 
     for occ in occurrences:
         occ_id, name, due = occ.id, occ.name, occ.due_date
@@ -118,6 +128,14 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
                 logger.exception(
                     f"Не удалось собрать текст напоминания по периоду #{occ_id} "
                     f"через {channel.__name__}"
+                )
+                log_event(
+                    logger,
+                    logging.ERROR,
+                    "reminder.build_failed",
+                    occurrence_id=occ_id,
+                    channel=channel.__name__,
+                    exc_info=True,
                 )
 
         # Захватываем период
@@ -144,10 +162,25 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
                         f"Канал {channel.__name__} ничего не доставил "
                         f"по периоду #{occ_id}"
                     )
+                    log_event(
+                        logger,
+                        logging.WARNING,
+                        "reminder.channel_empty",
+                        occurrence_id=occ_id,
+                        channel=channel.__name__,
+                    )
             except Exception:
                 logger.exception(
                     f"Не удалось отправить напоминание по периоду #{occ_id} "
                     f"через {channel.__name__}"
+                )
+                log_event(
+                    logger,
+                    logging.ERROR,
+                    "reminder.channel_failed",
+                    occurrence_id=occ_id,
+                    channel=channel.__name__,
+                    exc_info=True,
                 )
 
         if success:
@@ -155,10 +188,27 @@ def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> in
             logger.info(
                 f"Напоминание отправлено: «{name}», срок {due} (период #{occ_id})"
             )
+            log_event(
+                logger,
+                logging.INFO,
+                "reminder.sent",
+                occurrence_id=occ_id,
+                name=name,
+                due=due.isoformat(),
+                channels=[ch.__name__ for ch, _ in messages],
+            )
         else:
             # Если все каналы упали с ошибкой — освобождаем период для следующей попытки
             logger.error(
                 f"Все каналы не смогли отправить напоминание по периоду #{occ_id}"
+            )
+            log_event(
+                logger,
+                logging.ERROR,
+                "reminder.all_channels_failed",
+                occurrence_id=occ_id,
+                name=name,
+                due=due.isoformat(),
             )
             _release(db, occ_id)
 
