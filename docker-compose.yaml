@@ -45,7 +45,7 @@ services:
         # в /api на своём origin, nginx проксирует его в бэкенд.
         VITE_API_URL: ${VITE_API_URL:-/api/v1}
     ports:
-      - "5173:80" # снаружи 5173 (адрес панели не меняется), внутри nginx слушает 80
+      - "80:80" # снаружи 80, внутри nginx слушает 80
     depends_on:
       - backend
     restart: unless-stopped
