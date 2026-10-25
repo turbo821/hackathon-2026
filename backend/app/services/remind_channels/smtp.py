@@ -56,7 +56,6 @@ def _build_message(text: str) -> EmailMessage:
     return msg
 
 
-<<<<<<< HEAD
 def _recv_exact(sock: socket.socket, size: int) -> bytes:
     """Читает ровно size байт — recv() может вернуть меньше."""
     chunks = []
@@ -127,21 +126,12 @@ def _connect() -> smtplib.SMTP:
     - напрямую с TLS на 465 (обычный случай);
     - напрямую с STARTTLS на 587 — у Mail.ru на 465 отказывает;
     - через SOCKS5-прокси (SMTP_PROXY) — когда до сервера не достучаться.
-=======
-def _connect() -> smtplib.SMTP:
-    """Открывает соединение с почтовым сервером и логинится.
-
-    Два режима:
-    - напрямую с TLS на 465 (обычный случай);
-    - напрямую с STARTTLS на 587 — у Mail.ru на 465 отказывает.
->>>>>>> 41254a22ffb451ae5892969791cec17148fb0b81
     """
     context = ssl.create_default_context()
     host = settings.smtp_host
     port = settings.smtp_port
     password = settings.smtp_password.get_secret_value()
 
-<<<<<<< HEAD
     if settings.smtp_proxy:
         # smtplib сам прокси не умеет: поднимаем сокет через SOCKS5 руками
         # и отдаём smtplib готовый сокет.
@@ -158,9 +148,6 @@ def _connect() -> smtplib.SMTP:
             server.starttls(context=context)
             server.ehlo()
     elif settings.smtp_starttls:
-=======
-    if settings.smtp_starttls:
->>>>>>> 41254a22ffb451ae5892969791cec17148fb0b81
         server = smtplib.SMTP(host, port, timeout=30)
         server.ehlo()
         server.starttls(context=context)

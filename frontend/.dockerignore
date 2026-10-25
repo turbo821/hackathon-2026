@@ -1,20 +1,3 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> origin/dev
-node_modules
-dist
-.vscode
-.idea
-<<<<<<< HEAD
-*.log
-=======
-=======
->>>>>>> 0ba6f5d (fix docker)
->>>>>>> 41254a22ffb451ae5892969791cec17148fb0b81
 # node_modules с хостовой машины (там бинарники под Windows) — в образ не нужны,
 # образ всё равно ставит зависимости сам через npm ci
 node_modules
@@ -26,13 +9,3 @@ dist
 .gitignore
 Dockerfile
 .dockerignore
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> 0ba6f5d (fix docker)
-=======
->>>>>>> 0ba6f5d (fix docker)
->>>>>>> 41254a22ffb451ae5892969791cec17148fb0b81
-=======
-*.log
->>>>>>> origin/dev
