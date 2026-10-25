@@ -2,7 +2,10 @@
 // Скрипт подключён как module (type="module"), поэтому функции, которые
 // вызываются из onclick в HTML, в конце файла выставляются в window.
 
-const API_URL = (import.meta.env?.VITE_API_URL || 'http://backend:5000/api/v1').replace(/\/+$/, '');
+// Адрес API. По умолчанию — относительный: запрос уходит на тот же origin,
+// где открыта страница. Docker-имя 'backend' (или 'localhost') в адресе на
+// сервере означало бы машину пользователя, а не сам сервер.
+const API_URL = (import.meta.env?.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
 
 // На бэкенде роль владельца называется superadmin, в интерфейсе — owner
 const ROLE_LABELS = { superadmin: 'owner', admin: 'admin', user: 'user' };
@@ -82,7 +85,9 @@ class ApiError extends Error {
 }
 
 async function api(path, { method = 'GET', body, params } = {}) {
-    const url = new URL(API_URL + path);
+    // Второй аргумент нужен для относительного API_URL: без него
+    // new URL('/api/v1/...') бросает Invalid URL.
+    const url = new URL(API_URL + path, window.location.origin);
     if (params) {
         for (const [k, v] of Object.entries(params)) {
             if (v !== null && v !== undefined && v !== '') url.searchParams.set(k, v);
