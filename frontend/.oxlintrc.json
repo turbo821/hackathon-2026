@@ -1,7 +1,5 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["oxc"],
-  "rules": {
-    // Здесь вы можете настраивать правила для чистого JS, если это необходимо
-  }
+  "env": { "browser": true, "es2022": true }
 }
