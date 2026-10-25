@@ -11,7 +11,7 @@
   "inbounds": [
     {
       "tag": "socks-in",
-      "listen": "0.0.0.0",
+      "listen": "172.17.0.1",
       "port": 1080,
       "protocol": "socks",
       "settings": {
@@ -22,7 +22,7 @@
     },
     {
       "tag": "http-in",
-      "listen": "0.0.0.0",
+      "listen": "172.17.0.1",
       "port": 8080,
       "protocol": "http",
       "settings": {
@@ -31,6 +31,23 @@
     }
   ],
   "outbounds": [
+    {
+      "tag": "warp",
+      "protocol": "socks",
+      "settings": {
+        "servers": [
+          {
+            "address": "127.0.0.1",
+            "port": 40000
+          }
+        ]
+      },
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIPv4"
+        }
+      }
+    },
     {
       "tag": "direct",
       "protocol": "freedom",
@@ -48,13 +65,7 @@
       {
         "type": "field",
         "inboundTag": ["socks-in", "http-in"],
-        "domain": ["localhost", "backend", "frontend", "worker", "xray"],
-        "outboundTag": "direct"
-      },
-      {
-        "type": "field",
-        "inboundTag": ["socks-in", "http-in"],
-        "outboundTag": "direct"
+        "outboundTag": "warp"
       }
     ]
   }

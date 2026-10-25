@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     # Чат, в который пользователи вступают по ссылке с сайта. Бот должен быть
     # в нём администратором с правом can_invite_users.
     telegram_group_chat_id: str = ""
+    # Чат для оповещений о новых регулярных платежах. Пусто — слать в общий
+    # чат (TELEGRAM_CHAT_ID). Задаётся отдельно, когда оповещения нужны
+    # не в том же чате, что и напоминания.
+    telegram_notify_chat_id: str = ""
     # --- SMTP ---
     smtp_host: str = "smtp.mail.ru"
     smtp_port: int = 465

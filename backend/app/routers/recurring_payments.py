@@ -9,6 +9,7 @@ from app.models import PaymentOccurrence, RecurringPayment
 from app.models.payment_occurrence import STATUS_UNPAID
 from app.schemas.payments import RecurringPaymentCreate, RecurringPaymentOut
 from app.services.periods import ensure_all_occurrences, ensure_occurrences
+from app.services.recurring_notifications import notify_recurring_created
 from app.services.reminders import remind_for_payment
 from app.services.serializers import recurring_payment_to_dict
 from app.timeutils import today, utcnow
@@ -20,7 +21,11 @@ router = APIRouter(prefix="/recurring-payments", tags=["recurring-payments"])
 ADMIN_ONLY = {403: {"description": "Только администратор"}}
 
 
-@router.get("", response_model=list[RecurringPaymentOut], summary="Получение списка регулярных платежей")
+@router.get(
+    "",
+    response_model=list[RecurringPaymentOut],
+    summary="Получение списка регулярных платежей",
+)
 def list_payments(db: DB, user: CurrentUser, include_inactive: bool = False):
     """По умолчанию только активные. `include_inactive=true` — вместе с прекращёнными.
 
@@ -32,7 +37,9 @@ def list_payments(db: DB, user: CurrentUser, include_inactive: bool = False):
     query = select(RecurringPayment)
     if not include_inactive:
         query = query.where(RecurringPayment.is_active.is_(True))
-    items = db.scalars(query.order_by(RecurringPayment.is_active.desc(), RecurringPayment.name)).all()
+    items = db.scalars(
+        query.order_by(RecurringPayment.is_active.desc(), RecurringPayment.name)
+    ).all()
     return [recurring_payment_to_dict(rp) for rp in items]
 
 
@@ -44,8 +51,11 @@ def list_payments(db: DB, user: CurrentUser, include_inactive: bool = False):
     responses=ADMIN_ONLY,
 )
 def create_payment(data: RecurringPaymentCreate, db: DB, admin: AdminUser):
-    """Сразу создаются периоды. Если срок ближайшей оплаты ближе, чем через 3 дня,
-    напоминание в Telegram отправляется сразу."""
+    """Сразу создаются периоды.
+
+    В общий чат уходит оповещение о новом платеже. Если срок ближайшей оплаты
+    ближе, чем через 3 дня, дополнительно приходит напоминание об оплате.
+    """
     on = today()
     rp = RecurringPayment(
         name=data.name,
@@ -62,6 +72,12 @@ def create_payment(data: RecurringPaymentCreate, db: DB, admin: AdminUser):
     db.commit()
 
     # Ошибка Telegram не должна ломать создание платежа.
+    try:
+        notify_recurring_created(db, rp, created_by=admin.username, on=on)
+    except Exception:
+        logger.exception(f"Не удалось отправить оповещение о новом платеже #{rp.id}")
+        db.rollback()
+
     try:
         remind_for_payment(db, rp, on)
     except Exception:

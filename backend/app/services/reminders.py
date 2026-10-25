@@ -23,6 +23,7 @@ from app.models.payment_occurrence import STATUS_UNPAID
 from app.services.periods import ensure_all_occurrences
 from app.services.recipients import email_recipients
 from app.services.remind_channels import smtp, telegram
+from app.services.remind_channels.utils import pay_button
 from app.timeutils import today, utcnow
 
 logger = get_logger(__name__)
@@ -79,9 +80,7 @@ def _reply_markup(channel: Any, occ_id: int) -> dict | None:
     """Кнопка «Оплачено» — только каналам, которые её умеют (Telegram)."""
     if not getattr(channel, "supports_reply_markup", False):
         return None
-    return {
-        "inline_keyboard": [[{"text": "✅ Оплачено", "callback_data": f"pay:{occ_id}"}]]
-    }
+    return pay_button(occ_id)
 
 
 def _send_for(db: Session, occurrences: list[PaymentOccurrence], on: date) -> int:
