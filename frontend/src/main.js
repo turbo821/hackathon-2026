@@ -10,6 +10,7 @@ import { initPayments } from './pages/payments.js';
 import { initRecurring } from './pages/recurring.js';
 import { initUsers } from './pages/users.js';
 import { session } from './state.js';
+import { initTelegram } from './telegram.js';
 import { initConfirm } from './ui/confirm.js';
 import { showToast } from './ui/toast.js';
 
@@ -25,6 +26,7 @@ initDashboard();
 initPayments();
 initRecurring();
 initUsers();
+initTelegram();
 
 async function start() {
     if (session.token && (await restoreSession())) showDashboard();
