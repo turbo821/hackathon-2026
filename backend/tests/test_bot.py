@@ -5,7 +5,12 @@ from datetime import timedelta
 import pytest
 from app.models import PaymentOccurrence, RecurringPayment, TelegramLink, User
 from app.services import telegram
-from app.services.bot import handle_pay_button, handle_start, handle_update
+from app.services.bot import (
+    handle_chat_member,
+    handle_pay_button,
+    handle_start,
+    handle_update,
+)
 from app.timeutils import utcnow
 
 
@@ -80,6 +85,87 @@ def test_start_binds_telegram_to_user(db, tg_user):
     db.refresh(tg_user)
     assert tg_user.telegram_id == 555001
     assert "привязаны" in answer
+
+
+def test_binding_is_logged_explicitly(db, tg_user, caplog):
+    """Привязка отмечается в логе: видно, какой Telegram ID какому аккаунту."""
+    import logging
+
+    caplog.set_level(logging.INFO)
+    make_link(db, tg_user)
+
+    handle_start(db, 555777, "tok123")
+
+    # структурированное событие
+    bound = [r for r in caplog.records if getattr(r, "event", None) == "telegram.bound"]
+    assert bound, "нет записи telegram.bound в логах"
+    record = bound[0]
+    assert record.telegram_id == 555777
+    assert record.username == tg_user.username
+    assert record.user_id == tg_user.id
+    assert record.email == tg_user.email
+    assert record.source == "start_link"
+
+    # и понятная строка для человека
+    messages = " ".join(r.getMessage() for r in caplog.records)
+    assert "555777" in messages
+    assert tg_user.username in messages
+    assert tg_user.email in messages
+
+
+def test_binding_via_chat_join_logged_with_source(db, tg_user, caplog):
+    """Вступление в чат — тоже привязка, но со своим source."""
+    import logging
+
+    caplog.set_level(logging.INFO)
+    make_link(db, tg_user, token="join-tok")
+
+    handle_chat_member(
+        db,
+        {
+            "chat_member": {
+                "new_chat_member": {"status": "member", "user": {"id": 888222}},
+                "old_chat_member": {"status": "left"},
+                "invite_link": {"name": "join-tok"},
+            }
+        },
+    )
+
+    bound = [r for r in caplog.records if getattr(r, "event", None) == "telegram.bound"]
+    assert bound, "нет записи telegram.bound в логах"
+    assert bound[0].source == "chat_join"
+    assert bound[0].telegram_id == 888222
+
+
+def test_rebinding_logs_unbind_of_previous_owner(db, tg_user, caplog):
+    """Если Telegram был привязан к другому аккаунту — это тоже попадает в лог."""
+    import logging
+
+    caplog.set_level(logging.INFO)
+
+    # Telegram ID принадлежит другому пользователю
+    other = User(username="petr", email="petr@example.com", password_hash="x")
+    db.add(other)
+    db.commit()
+    other.telegram_id = 555999
+    db.commit()
+
+    # А привязка приходит к нашему пользователю
+    make_link(db, tg_user, token="tok-rebind")
+    handle_start(db, 555999, "tok-rebind")
+
+    unbound = [
+        r for r in caplog.records if getattr(r, "event", None) == "telegram.unbound"
+    ]
+    assert unbound, "нет записи telegram.unbound в логах"
+    assert unbound[0].previous_username == "petr"
+    assert unbound[0].telegram_id == 555999
+
+    # прежний владелец освобождён, новый — привязан
+    db.refresh(other)
+    db.refresh(tg_user)
+    assert other.telegram_id is None
+    assert tg_user.telegram_id == 555999
 
 
 def test_expired_link_does_not_bind(db, tg_user):

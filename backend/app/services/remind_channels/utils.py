@@ -23,3 +23,16 @@ def get_time_until(due_date: date, on: date) -> str:
         return "завтра"
     else:
         return f"через {left} {days_word(left)}"
+
+
+def pay_button(occurrence_id: int) -> dict:
+    """Inline-кнопка «Оплачено» для периода.
+
+    Формат один на всё приложение: бот разбирает callback_data вида
+    `pay:<id>`. Кнопку умеет только Telegram — почта её игнорирует.
+    """
+    return {
+        "inline_keyboard": [
+            [{"text": "✅ Оплачено", "callback_data": f"pay:{occurrence_id}"}]
+        ]
+    }

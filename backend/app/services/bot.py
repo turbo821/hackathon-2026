@@ -9,10 +9,12 @@
 telegram_id в базе — в журнале оплат будет имя из системы, а не @username.
 """
 
+import logging
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.logging_config import get_logger
+from app.logging_config import get_logger, log_event
 from app.models import PaymentOccurrence, TelegramLink, User
 from app.models.payment_occurrence import PAID_SOURCE_TELEGRAM, STATUS_PAID
 from app.services import telegram
@@ -21,13 +23,26 @@ from app.timeutils import today, utcnow
 logger = get_logger(__name__)
 
 
-def _bind_telegram(db: Session, link: TelegramLink, telegram_id: int) -> str:
+def _bind_telegram(
+    db: Session,
+    link: TelegramLink,
+    telegram_id: int,
+    source: str = "start_link",
+) -> str:
     """Привязывает Telegram-аккаунт к пользователю по коду из ссылки.
 
     Код одноразовый: после привязки он помечается использованным.
+
+    `source` — откуда привязка: `start_link` (ссылка-приглашение с кодом) или
+    `chat_join` (человек вступил в чат). Пишется в лог, чтобы было видно,
+    каким способом аккаунт уехал в Telegram.
     """
     user = db.get(User, link.user_id)
     if user is None:
+        logger.warning(
+            f"Telegram {telegram_id}: ссылка указывает на несуществующего "
+            f"пользователя id={link.user_id}"
+        )
         return "Пользователь не найден."
 
     # Если этот Telegram был привязан к другому — освобождаем ID.
@@ -37,12 +52,40 @@ def _bind_telegram(db: Session, link: TelegramLink, telegram_id: int) -> str:
     if other is not None and other.id != user.id:
         other.telegram_id = None
         db.commit()
-        logger.info(f"telegram {telegram_id}: отвязан от {other.username}")
+        logger.info(
+            f"Telegram ID {telegram_id} отвязан от аккаунта «{other.username}» "
+            f"(id={other.id}, {other.email})"
+        )
+        log_event(
+            logger,
+            logging.INFO,
+            "telegram.unbound",
+            telegram_id=telegram_id,
+            previous_username=other.username,
+            previous_user_id=other.id,
+            previous_email=other.email,
+        )
 
     user.telegram_id = telegram_id
     link.used_at = utcnow()
     db.commit()
-    logger.info(f"telegram {telegram_id}: привязан к {user.username}")
+
+    # Явная отметка привязки: без неё в логах не видно, кому принадлежит
+    # Telegram ID — а по нему работает inline-кнопка «Оплачено».
+    logger.info(
+        f"Telegram ID {telegram_id} привязан к аккаунту «{user.username}» "
+        f"(id={user.id}, {user.email}) способом {source}"
+    )
+    log_event(
+        logger,
+        logging.INFO,
+        "telegram.bound",
+        telegram_id=telegram_id,
+        username=user.username,
+        user_id=user.id,
+        email=user.email,
+        source=source,
+    )
     return f"Готово, вы привязаны как {user.username}."
 
 
@@ -62,7 +105,7 @@ def handle_start(db: Session, from_user_id: int, token: str) -> str:
     if link is None:
         return "Ссылка недействительна или уже использована. Создайте новую в панели."
 
-    return _bind_telegram(db, link, from_user_id)
+    return _bind_telegram(db, link, from_user_id, source="start_link")
 
 
 def handle_chat_member(db: Session, update: dict) -> str:
@@ -103,7 +146,7 @@ def handle_chat_member(db: Session, update: dict) -> str:
     if not telegram_id:
         return ""
 
-    return _bind_telegram(db, link, telegram_id)
+    return _bind_telegram(db, link, telegram_id, source="chat_join")
 
 
 def handle_pay_button(db: Session, from_user_id: int, occurrence_id: int) -> str:

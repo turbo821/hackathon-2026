@@ -73,7 +73,7 @@ def create_payment(data: RecurringPaymentCreate, db: DB, admin: AdminUser):
 
     # Ошибка Telegram не должна ломать создание платежа.
     try:
-        notify_recurring_created(rp, created_by=admin.username, on=on)
+        notify_recurring_created(db, rp, created_by=admin.username, on=on)
     except Exception:
         logger.exception(f"Не удалось отправить оповещение о новом платеже #{rp.id}")
         db.rollback()

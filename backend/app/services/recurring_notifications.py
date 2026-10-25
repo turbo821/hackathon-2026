@@ -16,11 +16,15 @@ import logging
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
 from app.config import settings
 from app.logging_config import get_logger, log_event
-from app.models import RecurringPayment
+from app.models import PaymentOccurrence, RecurringPayment
+from app.models.payment_occurrence import STATUS_UNPAID
 from app.services import telegram as telegram_client
-from app.services.remind_channels.utils import format_amount, get_time_until
+from app.services.remind_channels.utils import format_amount, get_time_until, pay_button
 from app.timeutils import today
 
 logger = get_logger(__name__)
@@ -47,6 +51,7 @@ def build_message(
     rp: RecurringPayment,
     on: date,
     created_by: str | None = None,
+    has_pay_button: bool = False,
 ) -> str:
     """Текст оповещения о новом регулярном платеже."""
     amount: Decimal = rp.amount
@@ -63,11 +68,33 @@ def build_message(
     ]
     if created_by:
         lines += ["", f"Добавил: {html.escape(created_by)}"]
+    if has_pay_button:
+        lines += ["", "Оплатили ближайший период — нажмите кнопку «Оплачено»."]
 
     return "\n".join(lines)
 
 
+def first_unpaid_occurrence(
+    db: Session, rp: RecurringPayment
+) -> PaymentOccurrence | None:
+    """Ближайший неоплаченный период платежа.
+
+    К нему привязывается inline-кнопка «Оплачено» в оповещении.
+    """
+    return db.scalars(
+        select(PaymentOccurrence)
+        .where(
+            PaymentOccurrence.recurring_payment_id == rp.id,
+            PaymentOccurrence.status == STATUS_UNPAID,
+            PaymentOccurrence.payment_ended_at.is_(None),
+        )
+        .order_by(PaymentOccurrence.due_date)
+        .limit(1)
+    ).first()
+
+
 def notify_recurring_created(
+    db: Session,
     rp: RecurringPayment,
     created_by: str | None = None,
     on: date | None = None,
@@ -82,10 +109,14 @@ def notify_recurring_created(
 
     on = on or today()
     chat_id = notify_chat_id()
-    text = build_message(rp, on, created_by)
+
+    # Кнопка «Оплачено» — на ближайший период платежа.
+    occurrence = first_unpaid_occurrence(db, rp)
+    reply_markup = pay_button(occurrence.id) if occurrence is not None else None
+    text = build_message(rp, on, created_by, has_pay_button=reply_markup is not None)
 
     try:
-        telegram_client.send_message(text, chat_id=chat_id)
+        telegram_client.send_message(text, chat_id=chat_id, reply_markup=reply_markup)
     except Exception:
         logger.exception(
             f"Не удалось отправить оповещение о новом платеже #{rp.id} в чат {chat_id}"
@@ -108,6 +139,8 @@ def notify_recurring_created(
         name=rp.name,
         chat_id=chat_id,
         created_by=created_by,
+        occurrence_id=occurrence.id if occurrence is not None else None,
+        pay_button=reply_markup is not None,
     )
     logger.info(f"Оповещение о новом платеже «{rp.name}» отправлено в чат {chat_id}")
     return True
