@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.errors import register_error_handlers
 from app.logging_config import get_logger, setup_logging
+from app.middleware import RequestContextMiddleware
 from app.routers import (
     auth,
     misc,
@@ -69,6 +70,9 @@ def create_app(log_name: str = "backend") -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # Контекст запроса (request id, пользователь) и журнал обращений.
+    # Ставится последним, чтобы оборачивать в том числе CORS-ответы.
+    app.add_middleware(RequestContextMiddleware)
     register_error_handlers(app)
 
     api = APIRouter(prefix=API_PREFIX)

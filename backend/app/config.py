@@ -45,6 +45,13 @@ class Settings(BaseSettings):
     smtp_password: SecretStr = SecretStr("")
     smtp_name: str = "Invoice Keeper"
     smtp_subject: str = "Напоминание об оплате"
+    # SOCKS5-прокси для SMTP: socks5://host:port. Нужен там, где до почтового
+    # сервера не достучаться напрямую (например, провайдер режет исходящие
+    # SMTP-порты или закрыт IPv4).
+    smtp_proxy: str = ""
+    # STARTTLS вместо TLS на подключении: порт 587 вместо 465. У Mail.ru
+    # на 465 отказывает, а 587 работает.
+    smtp_starttls: bool = False
 
     # --- Тестовые данные ---
     # Скрипт scripts.seed_demo создаёт демо-платежи (аренда/сервер/подписка).
@@ -52,6 +59,16 @@ class Settings(BaseSettings):
 
     # --- CORS ---
     cors_origins: str = "*"
+
+    # --- Логирование ---
+    # Уровень корневого логгера: DEBUG, INFO, WARNING, ERROR.
+    # DEBUG подробно показывает запросы SQL — полезно при разборе, но шумно.
+    log_level: str = "INFO"
+    # Формат записей: text (человекочитаемо) или json (для сервера и парсинга).
+    log_format: str = "text"
+    # Уровень для сторонних библиотек (uvicorn, httpx, sqlalchemy).
+    # WARNING — видны только проблемы, а не рутина.
+    log_level_libraries: str = "WARNING"
 
     telegram_bot_username: str = ""
 

@@ -21,4 +21,7 @@ tzdata
 
 # Тесты
 pytest>=8.0
-httpx>=0.27
+
+# Экстра [socks] обязателен: без socksio httpx не умеет SOCKS5-прокси,
+# а весь исходящий трафик идёт через xray (socks5://xray:1080).
+httpx[socks]>=0.27
